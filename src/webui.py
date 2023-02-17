@@ -370,6 +370,7 @@ def setup_gradio():
 					]
 				)
 		with gr.Tab("Training"):
+			with gr.Tab("Prepare Dataset"):
 				with gr.Row():
 					with gr.Column():
 						dataset_settings = [
@@ -377,6 +378,7 @@ def setup_gradio():
 						]
 						dataset_voices = dataset_settings[0]
 
+					with gr.Column():
 						prepare_dataset_button = gr.Button(value="Prepare")
 
 						def prepare_dataset_proxy( voice ):
@@ -387,7 +389,8 @@ def setup_gradio():
 							inputs=dataset_settings,
 							outputs=None
 						)
-
+			with gr.Tab("Generate Configuration"):
+				with gr.Row():
 					with gr.Column():
 						training_settings = [
 							gr.Slider(label="Batch Size", value=128),
@@ -395,6 +398,7 @@ def setup_gradio():
 							gr.Number(label="Print Frequency", value=50),
 							gr.Number(label="Save Frequency", value=50),
 						]
+						save_yaml_button = gr.Button(value="Save Training Configuration")
 					with gr.Column():
 						training_settings = training_settings + [
 							gr.Textbox(label="Training Name", placeholder="finetune"),
@@ -403,7 +407,7 @@ def setup_gradio():
 							gr.Textbox(label="Validation Name", placeholder="finetune"),
 							gr.Textbox(label="Validation Path", placeholder="./experiments/finetune/val.txt"),
 						]
-						save_yaml_button = gr.Button(value="Save Training Configuration")
+
 						save_yaml_button.click(save_training_settings,
 							inputs=training_settings,
 							outputs=None
@@ -424,6 +428,7 @@ def setup_gradio():
 						gr.Checkbox(label="Use CUDA for Voice Fixer", value=args.voice_fixer_use_cuda),
 						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
 						gr.Textbox(label="Device Override", value=args.device_override),
+						gr.Dropdown(label="Whisper Model", value=args.whisper_model, choices=["tiny", "base", "small", "medium", "large"]),
 					]
 					gr.Button(value="Check for Updates").click(check_for_updates)
 					gr.Button(value="Reload TTS").click(reload_tts)

@@ -57,6 +57,7 @@ def setup_args():
 		'voice-fixer-use-cuda': True,
 		'force-cpu-for-conditioning-latents': False,
 		'device-override': None,
+		'whisper-model': "base",
 		'concurrency-count': 2,
 		'output-sample-rate': 44100,
 		'output-volume': 1,
@@ -80,6 +81,7 @@ def setup_args():
 	parser.add_argument("--voice-fixer-use-cuda", action='store_true', default=default_arguments['voice-fixer-use-cuda'], help="Hints to voicefixer to use CUDA, if available.")
 	parser.add_argument("--force-cpu-for-conditioning-latents", default=default_arguments['force-cpu-for-conditioning-latents'], action='store_true', help="Forces computing conditional latents to be done on the CPU (if you constantyl OOM on low chunk counts)")
 	parser.add_argument("--device-override", default=default_arguments['device-override'], help="A device string to override pass through Torch")
+	parser.add_argument("--whisper-model", default=default_arguments['whisper-model'], help="Specifies which whisper model to use for transcription.")
 	parser.add_argument("--sample-batch-size", default=default_arguments['sample-batch-size'], type=int, help="Sets how many batches to use during the autoregressive samples pass")
 	parser.add_argument("--concurrency-count", type=int, default=default_arguments['concurrency-count'], help="How many Gradio events to process at once")
 	parser.add_argument("--output-sample-rate", type=int, default=default_arguments['output-sample-rate'], help="Sample rate to resample the output to (from 24KHz)")
@@ -463,7 +465,7 @@ whisper_model = None
 def prepare_dataset( files, outdir ):
 	global whisper_model
 	if whisper_model is None:
-		whisper_model = whisper.load_model("base")
+		whisper_model = whisper.load_model(args.whisper_model)
 
 	os.makedirs(outdir, exist_ok=True)
 
@@ -653,7 +655,7 @@ def get_voice_list(dir=get_voice_dir()):
 	os.makedirs(dir, exist_ok=True)
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ]) + ["microphone", "random"]
 
-def export_exec_settings( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, device_override, sample_batch_size, concurrency_count, output_sample_rate, output_volume ):
+def export_exec_settings( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, device_override, whisper_model, sample_batch_size, concurrency_count, output_sample_rate, output_volume ):
 	global args
 
 	args.listen = listen
@@ -663,6 +665,7 @@ def export_exec_settings( listen, share, check_for_updates, models_from_local_on
 	args.low_vram = low_vram
 	args.force_cpu_for_conditioning_latents = force_cpu_for_conditioning_latents
 	args.device_override = device_override
+	args.whisper_model = whisper_model
 	args.sample_batch_size = sample_batch_size
 	args.embed_output_metadata = embed_output_metadata
 	args.latents_lean_and_mean = latents_lean_and_mean
@@ -680,6 +683,7 @@ def export_exec_settings( listen, share, check_for_updates, models_from_local_on
 		'models-from-local-only':args.models_from_local_only,
 		'force-cpu-for-conditioning-latents': args.force_cpu_for_conditioning_latents,
 		'device-override': args.device_override,
+		'whisper-model': args.whisper_model,
 		'sample-batch-size': args.sample_batch_size,
 		'embed-output-metadata': args.embed_output_metadata,
 		'latents-lean-and-mean': args.latents_lean_and_mean,

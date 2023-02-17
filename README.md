@@ -223,7 +223,17 @@ To import a voice, click `Import Voice`. Remember to click `Refresh Voice List` 
 
 This tab will contain a collection of sub-tabs pertaining to training.
 
-#### Configuration
+#### Prepare Dataset
+
+This section will aid in preparing the dataset for fine-tuning.
+
+With it, you simply select a voice, then click the button, and wait for the console to tell you it's done. The results will be saved to `./training/{voice name}/`.
+
+The web UI will leverage [openai/whisper](https://github.com/openai/whisper) to transcribe a given sample source, and split them into convenient pieces.
+
+**!**NOTE**!**: transcription leverages FFMPEG, so please make sure you either have an FFMPEG installed visible to your PATH, or drop the binary in the `./bin/` folder.
+
+#### Generate Configuration
 
 This will generate the YAML necessary to feed into training. For now, you can set:
 * `Batch Size`: size of batches for training, more batches = faster training, at the cost of higher VRAM. setting this to 1 will lead to problems
@@ -255,6 +265,10 @@ Below are settings that override the default launch arguments. Some of these req
 * `Embed Output Metadata`: enables embedding the settings and latents used to generate that audio clip inside that audio clip. Metadata is stored as a JSON string in the `lyrics` tag.
 * `Slimmer Computed Latents`: falls back to the original, 12.9KiB way of storing latents (without the extra bits required for using the CVVP model).
 * `Voice Fixer`: runs each generated audio clip through `voicefixer`, if available and installed.
+* `Use CUDA for Voice Fixer`: allows voicefixer to use CUDA. Speeds up cleaning the output, but at the cost of more VRAM consumed. Disable if you OOM.
+* `Device Override`: overrides the device name used to pass to PyTorch for hardware acceleration. You can use the accompanied `list_devices.py` script to map valid strings to GPU names. You can also pass `cpu` if you want to fallback to software mode.
+* `Whisper Model`: the specific model to use for Whisper transcription, when preparing a dataset to finetune with.
+
 * `Voice Latent Max Chunk Size`: during the voice latents calculation pass, this limits how large, in bytes, a chunk can be. Large values can run into VRAM OOM errors.
 * `Sample Batch Size`: sets the batch size when generating autoregressive samples. Bigger batches result in faster compute, at the cost of increased VRAM consumption. Leave to 0 to calculate a "best" fit.
 * `Concurrency Count`: how many Gradio events the queue can process at once. Leave this over 1 if you want to modify settings in the UI that updates other settings while generating audio clips.
