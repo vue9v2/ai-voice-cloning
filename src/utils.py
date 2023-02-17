@@ -496,7 +496,7 @@ def prepare_dataset( files, outdir ):
 
 			torchaudio.save(f"{outdir}/{sliced_name}", sliced_waveform, sampling_rate)
 
-			transcription.append(f"{sliced_name}|{segment['text'].trim()}")
+			transcription.append(f"{sliced_name}|{segment['text'].strip()}")
 			idx = idx + 1
 	
 	with open(f'{outdir}/whisper.json', 'w', encoding="utf-8") as f:

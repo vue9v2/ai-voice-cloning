@@ -428,7 +428,7 @@ def setup_gradio():
 						gr.Checkbox(label="Use CUDA for Voice Fixer", value=args.voice_fixer_use_cuda),
 						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
 						gr.Textbox(label="Device Override", value=args.device_override),
-						gr.Dropdown(label="Whisper Model", value=args.whisper_model, choices=["tiny", "base", "small", "medium", "large"]),
+						gr.Dropdown(label="Whisper Model", value=args.whisper_model, choices=["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"]),
 					]
 					gr.Button(value="Check for Updates").click(check_for_updates)
 					gr.Button(value="Reload TTS").click(reload_tts)
