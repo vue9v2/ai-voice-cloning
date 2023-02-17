@@ -413,6 +413,41 @@ def setup_gradio():
 							inputs=training_settings,
 							outputs=None
 						)
+			with gr.Tab("Train"):
+				with gr.Row():
+					with gr.Column():
+						def get_training_configs():
+							configs = []
+							for i, file in enumerate(sorted(os.listdir(f"./training/"))):
+								if file[-5:] != ".yaml" or file[0] == ".":
+									continue
+								configs.append(f"./training/{file}")
+
+							return configs
+						def update_training_configs():
+							return gr.update(choices=get_training_configs())
+
+						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_configs())
+						refresh_configs = gr.Button(value="Refresh Configurations")
+						train = gr.Button(value="Train")
+
+					def run_training_proxy( config ):
+						global tts
+						del tts
+
+						import subprocess
+						subprocess.run(["python", "./src/train.py", "-opt", config], env=os.environ.copy(), shell=True)
+						"""
+						from train import train
+						train(config)
+						"""
+
+					refresh_configs.click(update_training_configs,inputs=None,outputs=training_configs)
+					train.click(run_training_proxy,
+						inputs=training_configs,
+						outputs=None
+					)
+
 		with gr.Tab("Settings"):
 			with gr.Row():
 				exec_inputs = []
