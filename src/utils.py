@@ -450,7 +450,6 @@ def save_training_settings( batch_size=None, learning_rate=None, print_rate=None
 		yaml = f.read()
 
 	for k in settings:
-		print(f"${{{k}}} => {settings[k]}")
 		yaml = yaml.replace(f"${{{k}}}", str(settings[k]))
 	
 	with open(f'./training/{settings["name"]}.yaml', 'w', encoding="utf-8") as f:
