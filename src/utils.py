@@ -485,11 +485,8 @@ def prepare_dataset( files, outdir ):
 
 		transcription = []
 		for segment in result['segments']:
-			start = int(segment['start'] * sampling_rate)-1
-			end = int(segment['end'] * sampling_rate)+1
-
-			print(segment['start'], segment['end'])
-			print(start, end)
+			start = int(segment['start'] * sampling_rate)
+			end = int(segment['end'] * sampling_rate)
 
 			sliced_waveform = waveform[:, start:end]
 			sliced_name = f"{pad(idx, 4)}.wav"
