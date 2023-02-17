@@ -55,7 +55,7 @@ def setup_args():
 		'sample-batch-size': None,
 		'embed-output-metadata': True,
 		'latents-lean-and-mean': True,
-		'voice-fixer': True,
+		'voice-fixer': False, # getting tired of long initialization times in a Colab for downloading a large dataset for it
 		'voice-fixer-use-cuda': True,
 		'force-cpu-for-conditioning-latents': False,
 		'device-override': None,
@@ -167,7 +167,7 @@ def generate(
 		progress(0, desc="Loading voice...")
 		voice_samples, conditioning_latents = load_voice(voice)
 
-	if voice_samples is not None:
+	if voice_samples is not None and len(voice_samples) > 0:
 		sample_voice = torch.cat(voice_samples, dim=-1).squeeze().cpu()
 
 		conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, progress=progress, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents)
@@ -374,7 +374,7 @@ def generate(
 		with open(f'{outdir}/{voice}_{name}.json', 'w', encoding="utf-8") as f:
 			f.write(json.dumps(info, indent='\t') )
 
-	if args.voice_fixer and voicefixer:
+	if args.voice_fixer and voicefixer is not None:
 		fixed_output_voices = []
 		for path in progress.tqdm(output_voices, desc="Running voicefix..."):
 			fixed = path.replace(".wav", "_fixed.wav")
@@ -409,6 +409,7 @@ def generate(
 	if 'latents' in info:
 		del info['latents']
 
+	os.makedirs('./config/', exist_ok=True)
 	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(info, indent='\t') )
 
@@ -422,13 +423,18 @@ def generate(
 		stats,
 	)
 
+import subprocess
+
 def run_training(config_path):
+	print("Unloading TTS to save VRAM.")
 	global tts
 	del tts
 	tts = None
 
-	import subprocess
-	subprocess.run(["python", "./src/train.py", "-opt", config_path], env=os.environ.copy(), shell=True, stdout=subprocess.PIPE)
+	cmd = ["python", "./src/train.py", "-opt", config_path]
+
+	print("Spawning process: ", " ".join(cmd))
+	subprocess.run(cmd, env=os.environ.copy(), shell=True, stdout=subprocess.STDOUT, stderr=subprocess.STDOUT)
 	"""
 	from train import train
 	train(config)
@@ -501,7 +507,7 @@ def prepare_dataset( files, outdir, language=None ):
 	for file in files:
 		print(f"Transcribing file: {file}")
 		
-		result = whisper_model.transcribe(file, language=language)
+		result = whisper_model.transcribe(file, language=language if language else "English")
 		results[os.path.basename(file)] = result
 
 		print(f"Transcribed file: {file}, {len(result['segments'])} found.")
@@ -557,7 +563,7 @@ def import_voice(file, saveAs = None):
 		path = f"{outdir}/{os.path.basename(filename)}"
 		waveform, sampling_rate = torchaudio.load(filename)
 
-		if args.voice_fixer:
+		if args.voice_fixer and voicefixer is not None:
 			# resample to best bandwidth since voicefixer will do it anyways through librosa
 			if sampling_rate != 44100:
 				print(f"Resampling imported voice sample: {path}")
@@ -714,6 +720,7 @@ def export_exec_settings( listen, share, check_for_updates, models_from_local_on
 		'output-volume': args.output_volume,
 	}
 
+	os.makedirs('./config/', exist_ok=True)
 	with open(f'./config/exec.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(settings, indent='\t') )
 
