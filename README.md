@@ -221,6 +221,27 @@ If you want to reuse its generation settings, simply click `Copy Settings`.
 
 To import a voice, click `Import Voice`. Remember to click `Refresh Voice List` in the `Generate` panel afterwards, if it's a new voice.
 
+### Training
+
+This tab will contain a collection of sub-tabs pertaining to training.
+
+#### Configuration
+
+This will generate the YAML necessary to feed into training. For now, you can set:
+* `Batch Size`: size of batches for training, more batches = faster training, at the cost of higher VRAM. setting this to 1 will lead to problems
+* `Learning Rate`: how large changes to training will be made, lower values = better over the long term, while higher values will fry a model fast. For fine-tuning, the default *should* be fine, but in the future, a learning rate scheduler would be better (have a higher learning rate initially, then step it down over enough steps/epochs)
+* `Print Frequency`: how often to print (I assume)
+* `Save Frequency`: how often to save checkpoints
+* `Training Name`: name to save the configuration as, as well as the training script to create the folder under
+* `Dataset Name`: **!**TODO**!**: fill
+* `Dataset Path`: path to the input training text file. For LJSpeech-esque datasets, this is to a textfile formatted like:
+```
+wavs/LJ001-0001.wav|Printing, in the only sense with which we are at present concerned, differs from most if not from all the arts and crafts represented in the Exhibition|Printing, in the only sense with which we are at present concerned, differs from most if not from all the arts and crafts represented in the Exhibition
+wavs/LJ001-0002.wav|in being comparatively modern.|in being comparatively modern.
+```
+* `Validation Name`: **!**TODO**!**: fill
+* `Validation Path`: path for the validation set, similar to the dataset. I'm not necessarily sure what to really use for this, so explicitly for testing, I just copied the training dataset text
+
 ### Settings
 
 This tab (should) hold a bunch of other settings, from tunables that shouldn't be tampered with, to settings pertaining to the web UI itself.

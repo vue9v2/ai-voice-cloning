@@ -138,7 +138,7 @@ def generate(
 	try:
 		tts
 	except NameError:
-		raise gr.Error("TTS is still initializing...")
+		raise Exception("TTS is still initializing...")
 
 	if voice != "microphone":
 		voices = [voice]
@@ -147,7 +147,7 @@ def generate(
 
 	if voice == "microphone":
 		if mic_audio is None:
-			raise gr.Error("Please provide audio from mic when choosing `microphone` as a voice input")
+			raise Exception("Please provide audio from mic when choosing `microphone` as a voice input")
 		mic = load_audio(mic_audio, tts.input_sample_rate)
 		voice_samples, conditioning_latents = [mic], None
 	elif voice == "random":
@@ -432,3 +432,249 @@ def setup_tortoise(restart=False):
 	tts = TextToSpeech(minor_optimizations=not args.low_vram)
 	print("TorToiSe initialized, ready for generation.")
 	return tts
+
+def save_training_settings( batch_size=None, learning_rate=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None ):
+	settings = {
+		"batch_size": batch_size if batch_size else 128,
+		"learning_rate": learning_rate if learning_rate else 1e-5,
+		"print_rate": print_rate if print_rate else 50,
+		"save_rate": save_rate if save_rate else 50,
+		"name": name if name else "finetune",
+		"dataset_name": dataset_name if dataset_name else "finetune",
+		"dataset_path": dataset_path if dataset_path else "./experiments/finetune/train.txt",
+		"validation_name": validation_name if validation_name else "finetune",
+		"validation_path": validation_path if validation_path else "./experiments/finetune/val.txt",
+	}
+
+	with open(f'./training/.template.yaml', 'r', encoding="utf-8") as f:
+		yaml = f.read()
+
+	for k in settings:
+		print(f"${{{k}}} => {settings[k]}")
+		yaml = yaml.replace(f"${{{k}}}", str(settings[k]))
+	
+	with open(f'./training/{settings["name"]}.yaml', 'w', encoding="utf-8") as f:
+		f.write(yaml)
+
+def reset_generation_settings():
+	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
+		f.write(json.dumps({}, indent='\t') )
+	return import_generate_settings()
+
+def import_voice(file, saveAs = None):
+	global args
+
+	j, latents = read_generate_settings(file, read_latents=True)
+	
+	if j is not None and saveAs is None:
+		saveAs = j['voice']
+	if saveAs is None or saveAs == "":
+		raise Exception("Specify a voice name")
+
+	outdir = f'{get_voice_dir()}/{saveAs}/'
+	os.makedirs(outdir, exist_ok=True)
+	if latents:
+		with open(f'{outdir}/cond_latents.pth', 'wb') as f:
+			f.write(latents)
+		latents = f'{outdir}/cond_latents.pth'
+		print(f"Imported latents to {latents}")
+	else:
+		filename = file.name
+		if filename[-4:] != ".wav":
+			raise Exception("Please convert to a WAV first")
+
+		path = f"{outdir}/{os.path.basename(filename)}"
+		waveform, sampling_rate = torchaudio.load(filename)
+
+		if args.voice_fixer:
+			# resample to best bandwidth since voicefixer will do it anyways through librosa
+			if sampling_rate != 44100:
+				print(f"Resampling imported voice sample: {path}")
+				resampler = torchaudio.transforms.Resample(
+					sampling_rate,
+					44100,
+					lowpass_filter_width=16,
+					rolloff=0.85,
+					resampling_method="kaiser_window",
+					beta=8.555504641634386,
+				)
+				waveform = resampler(waveform)
+				sampling_rate = 44100
+
+			torchaudio.save(path, waveform, sampling_rate)
+
+			print(f"Running 'voicefixer' on voice sample: {path}")
+			voicefixer.restore(
+				input = path,
+				output = path,
+				cuda=get_device_name() == "cuda" and args.voice_fixer_use_cuda,
+				#mode=mode,
+			)
+		else:
+			torchaudio.save(path, waveform, sampling_rate)
+
+
+		print(f"Imported voice to {path}")
+
+
+def import_generate_settings(file="./config/generate.json"):
+	settings, _ = read_generate_settings(file, read_latents=False)
+	
+	if settings is None:
+		return None
+
+	return (
+		None if 'text' not in settings else settings['text'],
+		None if 'delimiter' not in settings else settings['delimiter'],
+		None if 'emotion' not in settings else settings['emotion'],
+		None if 'prompt' not in settings else settings['prompt'],
+		None if 'voice' not in settings else settings['voice'],
+		None,
+		None,
+		None if 'seed' not in settings else settings['seed'],
+		None if 'candidates' not in settings else settings['candidates'],
+		None if 'num_autoregressive_samples' not in settings else settings['num_autoregressive_samples'],
+		None if 'diffusion_iterations' not in settings else settings['diffusion_iterations'],
+		0.8 if 'temperature' not in settings else settings['temperature'],
+		"DDIM" if 'diffusion_sampler' not in settings else settings['diffusion_sampler'],
+		8   if 'breathing_room' not in settings else settings['breathing_room'],
+		0.0 if 'cvvp_weight' not in settings else settings['cvvp_weight'],
+		0.8 if 'top_p' not in settings else settings['top_p'],
+		1.0 if 'diffusion_temperature' not in settings else settings['diffusion_temperature'],
+		1.0 if 'length_penalty' not in settings else settings['length_penalty'],
+		2.0 if 'repetition_penalty' not in settings else settings['repetition_penalty'],
+		2.0 if 'cond_free_k' not in settings else settings['cond_free_k'],
+		None if 'experimentals' not in settings else settings['experimentals'],
+	)
+
+def curl(url):
+	try:
+		req = urllib.request.Request(url, headers={'User-Agent': 'Python'})
+		conn = urllib.request.urlopen(req)
+		data = conn.read()
+		data = data.decode()
+		data = json.loads(data)
+		conn.close()
+		return data
+	except Exception as e:
+		print(e)
+		return None
+
+def check_for_updates():
+	if not os.path.isfile('./.git/FETCH_HEAD'):
+		print("Cannot check for updates: not from a git repo")
+		return False
+
+	with open(f'./.git/FETCH_HEAD', 'r', encoding="utf-8") as f:
+		head = f.read()
+	
+	match = re.findall(r"^([a-f0-9]+).+?https:\/\/(.+?)\/(.+?)\/(.+?)\n", head)
+	if match is None or len(match) == 0:
+		print("Cannot check for updates: cannot parse FETCH_HEAD")
+		return False
+
+	match = match[0]
+
+	local = match[0]
+	host = match[1]
+	owner = match[2]
+	repo = match[3]
+
+	res = curl(f"https://{host}/api/v1/repos/{owner}/{repo}/branches/") #this only works for gitea instances
+
+	if res is None or len(res) == 0:
+		print("Cannot check for updates: cannot fetch from remote")
+		return False
+
+	remote = res[0]["commit"]["id"]
+
+	if remote != local:
+		print(f"New version found: {local[:8]} => {remote[:8]}")
+		return True
+
+	return False
+
+def reload_tts():
+	global tts
+	del tts
+	tts = setup_tortoise(restart=True)
+
+def cancel_generate():
+	tortoise.api.STOP_SIGNAL = True
+
+def get_voice_list(dir=get_voice_dir()):
+	os.makedirs(dir, exist_ok=True)
+	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ]) + ["microphone", "random"]
+
+def export_exec_settings( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, device_override, sample_batch_size, concurrency_count, output_sample_rate, output_volume ):
+	global args
+
+	args.listen = listen
+	args.share = share
+	args.check_for_updates = check_for_updates
+	args.models_from_local_only = models_from_local_only
+	args.low_vram = low_vram
+	args.force_cpu_for_conditioning_latents = force_cpu_for_conditioning_latents
+	args.device_override = device_override
+	args.sample_batch_size = sample_batch_size
+	args.embed_output_metadata = embed_output_metadata
+	args.latents_lean_and_mean = latents_lean_and_mean
+	args.voice_fixer = voice_fixer
+	args.voice_fixer_use_cuda = voice_fixer_use_cuda
+	args.concurrency_count = concurrency_count
+	args.output_sample_rate = output_sample_rate
+	args.output_volume = output_volume
+
+	settings = {
+		'listen': None if args.listen else args.listen,
+		'share': args.share,
+		'low-vram':args.low_vram,
+		'check-for-updates':args.check_for_updates,
+		'models-from-local-only':args.models_from_local_only,
+		'force-cpu-for-conditioning-latents': args.force_cpu_for_conditioning_latents,
+		'device-override': args.device_override,
+		'sample-batch-size': args.sample_batch_size,
+		'embed-output-metadata': args.embed_output_metadata,
+		'latents-lean-and-mean': args.latents_lean_and_mean,
+		'voice-fixer': args.voice_fixer,
+		'voice-fixer-use-cuda': args.voice_fixer_use_cuda,
+		'concurrency-count': args.concurrency_count,
+		'output-sample-rate': args.output_sample_rate,
+		'output-volume': args.output_volume,
+	}
+
+	with open(f'./config/exec.json', 'w', encoding="utf-8") as f:
+		f.write(json.dumps(settings, indent='\t') )
+
+def read_generate_settings(file, read_latents=True, read_json=True):
+	j = None
+	latents = None
+
+	if file is not None:
+		if hasattr(file, 'name'):
+			file = file.name
+
+		if file[-4:] == ".wav":
+			metadata = music_tag.load_file(file)
+			if 'lyrics' in metadata:
+				j = json.loads(str(metadata['lyrics']))
+		elif file[-5:] == ".json":
+			with open(file, 'r') as f:
+				j = json.load(f)
+
+	if j is None:
+		print("No metadata found in audio file to read")
+	else:
+		if 'latents' in j:
+			if read_latents:
+				latents = base64.b64decode(j['latents'])
+			del j['latents']
+		
+
+		if "time" in j:
+			j["time"] = "{:.3f}".format(j["time"])
+
+	return (
+		j,
+		latents,
+	)
