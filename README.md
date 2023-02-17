@@ -1,14 +1,12 @@
 # AI Voice Cloning
 
-This [repo](https://git.ecker.tech/mrq/ai-voice-cloning)/[rentry](https://rentry.org/AI-Voice-Cloning/) aims to serve as both a foolproof guide for setting up AI voice cloning tools for legitimate, local use on Windows, as well as a stepping stone for anons that genuinely want to play around with [TorToiSe](https://github.com/neonbjb/tortoise-tts).
+This [repo](https://git.ecker.tech/mrq/ai-voice-cloning)/[rentry](https://rentry.org/AI-Voice-Cloning/) aims to serve as both a foolproof guide for setting up AI voice cloning tools for legitimate, local use on Windows/Linux, as well as a stepping stone for anons that genuinely want to play around with [TorToiSe](https://github.com/neonbjb/tortoise-tts).
 
 Similar to my own findings for Stable Diffusion image generation, this rentry may appear a little disheveled as I note my new findings with TorToiSe. Please keep this in mind if the guide seems to shift a bit or sound confusing.
 
 >\>Ugh... why bother when I can just abuse 11.AI?
 
-I very much encourage (You) to use 11.AI while it's still viable to use. For the layman, it's easier to go through the hoops of coughing up the $5 or abusing the free trial over actually setting up a TorToiSe environment and dealing with its quirks.
-
-However, I also encourage your own experimentation with TorToiSe, as it's very, very promising, it just takes a little love and elbow grease.
+You're more than welcome to, but TorToiSe is shaping up to be a very promising tool, especially with finetuning now on the horizon.
 
 This is not endorsed by [neonbjb](https://github.com/neonbjb/). I do not expect this to run into any ethical issues, as it seems (like me), this is mostly for making funny haha vidya characters say funny lines.
 
@@ -303,18 +301,3 @@ Output (`Is that really you, Mary?`, Ultra Fast preset, settings and latents emb
 * https://files.catbox.moe/gy1jvz.wav
 
 This was just a quick test for an adjustable setting, but this one turned out really nice (for being a quick test) on the off chance. It's not the original delivery, and it definitely sounds robotic still, but it's on the Ultra Fast preset, as expected.
-
-## Caveats (and Upsides)
-
-To me, I find a few problems with TorToiSe over 11.AI:
-* computation time is quite an issue. Despite Stable Diffusion proving to be adequate on my 2060, TorToiSe takes quite some time with modest settings.
-	- However, on my 6800XT, performance was drastically uplifted due to having more VRAM for larger batch sizes (at the cost of Krashing).
-* reproducability in a voice depends on the "compatibilty" with the model TorToiSe was trained on.
-	- However, this also appears to be similar to 11.AI, where it was mostly trained on audiobook readings.
-* the lack of an obvious analog to the "stability" and "similarity" sliders kind of sucks, but it's not the end of the world.
-	However, the `temperature` option seems to prove to be a proper analog to either of these.
-
-Although, I can look past these as TorToiSe offers, in comparison to 11.AI:
-* the "speaking too fast" issue does not exist with TorToiSe. I don't need to fight with it by pretending I'm a Gaia user in the early 2000s by sprinkling ellipses.
-* the overall delivery seems very natural, sometimes small, dramatic pauses gets added at the legitimately most convenient moments, and the inhales tend to be more natural. Many of vocaroos from 11.AI where it just does not seem properly delivered.
-* being able to run it locally means I do not have to worry about some Polack seeing me use the "dick" word.

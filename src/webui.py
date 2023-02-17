@@ -15,7 +15,7 @@ import gradio.utils
 from datetime import datetime
 
 import tortoise.api
-from tortoise.utils.audio import get_voice_dir
+from tortoise.utils.audio import get_voice_dir, get_voices
 
 from utils import *
 
@@ -370,8 +370,24 @@ def setup_gradio():
 					]
 				)
 		with gr.Tab("Training"):
-			with gr.Tab("Configuration"):
 				with gr.Row():
+					with gr.Column():
+						dataset_settings = [
+							gr.Dropdown( get_voice_list(), label="Dataset Source", type="value" ),
+						]
+						dataset_voices = dataset_settings[0]
+
+						prepare_dataset_button = gr.Button(value="Prepare")
+
+						def prepare_dataset_proxy( voice ):
+							return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/" )
+
+						prepare_dataset_button.click(
+							prepare_dataset_proxy,
+							inputs=dataset_settings,
+							outputs=None
+						)
+
 					with gr.Column():
 						training_settings = [
 							gr.Slider(label="Batch Size", value=128),
@@ -453,6 +469,7 @@ def setup_gradio():
 		def update_voices():
 			return (
 				gr.Dropdown.update(choices=get_voice_list()),
+				gr.Dropdown.update(choices=get_voice_list()),
 				gr.Dropdown.update(choices=get_voice_list("./results/")),
 			)
 
@@ -463,6 +480,7 @@ def setup_gradio():
 			inputs=None,
 			outputs=[
 				voice,
+				dataset_voices,
 				history_voices
 			]
 		)

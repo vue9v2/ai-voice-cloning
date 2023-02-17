@@ -29,12 +29,12 @@ from tortoise.utils.audio import load_audio, load_voice, load_voices, get_voice_
 from tortoise.utils.text import split_and_recombine_text
 from tortoise.utils.device import get_device_name, set_device_name
 
+import whisper
 
 args = None
 tts = None
 webui = None
 voicefixer = None
-whisper = None
 dlas = None
 
 def get_args():
@@ -107,6 +107,13 @@ def setup_args():
 		args.listen_port = int(args.listen_port)
 	
 	return args
+
+def pad(num, zeroes):
+	s = ""
+	for i in range(zeroes,0,-1):
+		if num < 10 ** i:
+			s = f"{s}0"
+	return f"{s}{num}"
 
 def generate(
 	text,
@@ -253,11 +260,8 @@ def generate(
 		idx = keys[-1] + 1
 
 	# I know there's something to pad I don't care
-	pad = ""
-	for i in range(4,0,-1):
-		if idx < 10 ** i:
-			pad = f"{pad}0"
-	idx = f"{pad}{idx}"
+	
+	idx = pad(idx, 4)
 
 	def get_name(line=0, candidate=0, combined=False):
 		name = f"{idx}"
@@ -454,6 +458,50 @@ def save_training_settings( batch_size=None, learning_rate=None, print_rate=None
 	
 	with open(f'./training/{settings["name"]}.yaml', 'w', encoding="utf-8") as f:
 		f.write(yaml)
+
+whisper_model = None
+def prepare_dataset( files, outdir ):
+	global whisper_model
+	if whisper_model is None:
+		whisper_model = whisper.load_model("base")
+
+	os.makedirs(outdir, exist_ok=True)
+
+	idx = 0
+	results = {}
+
+	for file in files:
+		print(f"Transcribing file: {file}")
+		
+		result = whisper_model.transcribe(file)
+		results[os.path.basename(file)] = result
+
+		print(f"Transcribed file: {file}, {len(result['segments'])} found.")
+
+		waveform, sampling_rate = torchaudio.load(file)
+		num_channels, num_frames = waveform.shape
+
+		transcription = []
+		for segment in result['segments']:
+			start = int(segment['start'] * sampling_rate)-1
+			end = int(segment['end'] * sampling_rate)+1
+
+			print(segment['start'], segment['end'])
+			print(start, end)
+
+			sliced_waveform = waveform[:, start:end]
+			sliced_name = f"{pad(idx, 4)}.wav"
+
+			torchaudio.save(f"{outdir}/{sliced_name}", sliced_waveform, sampling_rate)
+
+			transcription.append(f"{sliced_name}|{segment['text'].trim()}")
+			idx = idx + 1
+	
+	with open(f'{outdir}/whisper.json', 'w', encoding="utf-8") as f:
+		f.write(json.dumps(results, indent='\t'))
+	
+	with open(f'{outdir}/train.txt', 'w', encoding="utf-8") as f:
+		f.write("\n".join(transcription))
 
 def reset_generation_settings():
 	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:

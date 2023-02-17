@@ -1,7 +1,9 @@
 git+https://git.ecker.tech/mrq/tortoise-tts.git
 # git+https://git.ecker.tech/mrq/DL-Art-School.git
-
-whisper
+git+https://github.com/openai/whisper.git
+more-itertools
+ffmpeg-python
 gradio
 music-tag
 voicefixer
+psutil
