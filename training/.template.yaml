@@ -24,6 +24,7 @@ datasets:
     num_conditioning_candidates: 2
     conditioning_length: 44000
     use_bpe_tokenizer: True
+    tokenizer_vocab: ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
   val:
     name: ${validation_name}
@@ -40,6 +41,7 @@ datasets:
     num_conditioning_candidates: 2
     conditioning_length: 44000
     use_bpe_tokenizer: True
+    tokenizer_vocab: ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
 
 steps:        
@@ -59,20 +61,20 @@ steps:
     injectors:  # TODO: replace this entire sequence with the GptVoiceLatentInjector
       paired_to_mel:
         type: torch_mel_spectrogram
-        mel_norm_file: ./experiments/clips_mel_norms.pth
+        mel_norm_file: ./models/tortoise/clips_mel_norms.pth
         in: wav
         out: paired_mel
       paired_cond_to_mel:
         type: for_each
         subtype: torch_mel_spectrogram
-        mel_norm_file: ./experiments/clips_mel_norms.pth
+        mel_norm_file: ./models/tortoise/clips_mel_norms.pth
         in: conditioning
         out: paired_conditioning_mel
       to_codes:
         type: discrete_token
         in: paired_mel
         out: paired_mel_codes
-        dvae_config: "./experiments/train_diffusion_vocoder_22k_level.yml" # EXTREMELY IMPORTANT
+        dvae_config: "./models/tortoise/train_diffusion_vocoder_22k_level.yml" # EXTREMELY IMPORTANT
       paired_fwd_text:
         type: generator
         generator: gpt
@@ -112,9 +114,9 @@ networks:
       #only_alignment_head: False  # uv3/4
 
 path:
-  pretrain_model_gpt: './experiments/autoregressive.pth' # CHANGEME: copy this from tortoise cache
+  pretrain_model_gpt: './models/tortoise/autoregressive.pth' # CHANGEME: copy this from tortoise cache
   strict_load: true
-  #resume_state: ./experiments/train_imgnet_vqvae_stage1/training_state/0.state   # <-- Set this to resume from a previous training state.
+  #resume_state: ./models/tortoise/train_imgnet_vqvae_stage1/training_state/0.state   # <-- Set this to resume from a previous training state.
 
 # afaik all units here are measured in **steps** (i.e. one batch of batch_size is 1 unit)
 train: # CHANGEME: ALL OF THESE PARAMETERS SHOULD BE EXPERIMENTED WITH

@@ -447,9 +447,9 @@ def save_training_settings( batch_size=None, learning_rate=None, print_rate=None
 		"save_rate": save_rate if save_rate else 50,
 		"name": name if name else "finetune",
 		"dataset_name": dataset_name if dataset_name else "finetune",
-		"dataset_path": dataset_path if dataset_path else "./experiments/finetune/train.txt",
+		"dataset_path": dataset_path if dataset_path else "./training/finetune/train.txt",
 		"validation_name": validation_name if validation_name else "finetune",
-		"validation_path": validation_path if validation_path else "./experiments/finetune/val.txt",
+		"validation_path": validation_path if validation_path else "./training/finetune/train.txt",
 	}
 
 	with open(f'./training/.template.yaml', 'r', encoding="utf-8") as f:
@@ -462,7 +462,7 @@ def save_training_settings( batch_size=None, learning_rate=None, print_rate=None
 		f.write(yaml)
 
 whisper_model = None
-def prepare_dataset( files, outdir ):
+def prepare_dataset( files, outdir, language=None ):
 	global whisper_model
 	if whisper_model is None:
 		whisper_model = whisper.load_model(args.whisper_model)
@@ -476,7 +476,7 @@ def prepare_dataset( files, outdir ):
 	for file in files:
 		print(f"Transcribing file: {file}")
 		
-		result = whisper_model.transcribe(file)
+		result = whisper_model.transcribe(file, language=language)
 		results[os.path.basename(file)] = result
 
 		print(f"Transcribed file: {file}, {len(result['segments'])} found.")

@@ -375,14 +375,15 @@ def setup_gradio():
 					with gr.Column():
 						dataset_settings = [
 							gr.Dropdown( get_voice_list(), label="Dataset Source", type="value" ),
+							gr.Textbox(label="Language", placeholder="English")
 						]
 						dataset_voices = dataset_settings[0]
 
 					with gr.Column():
 						prepare_dataset_button = gr.Button(value="Prepare")
 
-						def prepare_dataset_proxy( voice ):
-							return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/" )
+						def prepare_dataset_proxy( voice, language ):
+							return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language )
 
 						prepare_dataset_button.click(
 							prepare_dataset_proxy,
@@ -403,9 +404,9 @@ def setup_gradio():
 						training_settings = training_settings + [
 							gr.Textbox(label="Training Name", placeholder="finetune"),
 							gr.Textbox(label="Dataset Name", placeholder="finetune"),
-							gr.Textbox(label="Dataset Path", placeholder="./experiments/finetune/train.txt"),
+							gr.Textbox(label="Dataset Path", placeholder="./training/finetune/train.txt"),
 							gr.Textbox(label="Validation Name", placeholder="finetune"),
-							gr.Textbox(label="Validation Path", placeholder="./experiments/finetune/val.txt"),
+							gr.Textbox(label="Validation Path", placeholder="./training/finetune/train.txt"),
 						]
 
 						save_yaml_button.click(save_training_settings,
