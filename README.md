@@ -223,6 +223,9 @@ To import a voice, click `Import Voice`. Remember to click `Refresh Voice List` 
 
 This tab will contain a collection of sub-tabs pertaining to training.
 
+**!**NOTE**!**: training is still in it's infancy, as this was cobbled together to get a good baseline to iterate from afterwards, so be warned of the cruft as I tighten things down. I advise to be patient and understanding if something goes wrong.
+
+
 #### Prepare Dataset
 
 This section will aid in preparing the dataset for fine-tuning.
@@ -232,6 +235,7 @@ With it, you simply select a voice, then click the button, and wait for the cons
 The web UI will leverage [openai/whisper](https://github.com/openai/whisper) to transcribe a given sample source, and split them into convenient pieces.
 
 **!**NOTE**!**: transcription leverages FFMPEG, so please make sure you either have an FFMPEG installed visible to your PATH, or drop the binary in the `./bin/` folder.
+
 
 #### Generate Configuration
 
@@ -249,6 +253,14 @@ wavs/LJ001-0002.wav|in being comparatively modern.|in being comparatively modern
 ```
 * `Validation Name`: **!**TODO**!**: fill
 * `Validation Path`: path for the validation set, similar to the dataset. I'm not necessarily sure what to really use for this, so explicitly for testing, I just copied the training dataset text
+
+#### Train
+
+After preparing your dataset and configuration file, you are ready to train. Simply select a generated configuration file, click train, then keep an eye on the console window for output.
+
+Please be advised that integration is very much in its infancy.
+
+**!**NOTE**!**: for now, you must provide a `dvae.pth` file into `./models/tortoise/`. I'll add in a way to automatically grab it during initialization soon.
 
 ### Settings
 

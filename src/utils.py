@@ -53,7 +53,7 @@ def setup_args():
 		'sample-batch-size': None,
 		'embed-output-metadata': True,
 		'latents-lean-and-mean': True,
-		'voice-fixer': True,
+		'voice-fixer': False, # I'm tired of long initialization of Colab notebooks
 		'voice-fixer-use-cuda': True,
 		'force-cpu-for-conditioning-latents': False,
 		'device-override': None,
