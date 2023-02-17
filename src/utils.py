@@ -58,6 +58,7 @@ def setup_args():
 		'voice-fixer': False, # getting tired of long initialization times in a Colab for downloading a large dataset for it
 		'voice-fixer-use-cuda': True,
 		'force-cpu-for-conditioning-latents': False,
+		'defer-tts-load': False,
 		'device-override': None,
 		'whisper-model': "base",
 		'concurrency-count': 2,
@@ -82,6 +83,7 @@ def setup_args():
 	parser.add_argument("--voice-fixer", action='store_true', default=default_arguments['voice-fixer'], help="Uses python module 'voicefixer' to improve audio quality, if available.")
 	parser.add_argument("--voice-fixer-use-cuda", action='store_true', default=default_arguments['voice-fixer-use-cuda'], help="Hints to voicefixer to use CUDA, if available.")
 	parser.add_argument("--force-cpu-for-conditioning-latents", default=default_arguments['force-cpu-for-conditioning-latents'], action='store_true', help="Forces computing conditional latents to be done on the CPU (if you constantyl OOM on low chunk counts)")
+	parser.add_argument("--defer-tts-load", default=default_arguments['defer-tts-load'], action='store_true', help="Defers loading TTS model")
 	parser.add_argument("--device-override", default=default_arguments['device-override'], help="A device string to override pass through Torch")
 	parser.add_argument("--whisper-model", default=default_arguments['whisper-model'], help="Specifies which whisper model to use for transcription.")
 	parser.add_argument("--sample-batch-size", default=default_arguments['sample-batch-size'], type=int, help="Sets how many batches to use during the autoregressive samples pass")
@@ -434,7 +436,7 @@ def run_training(config_path):
 	cmd = ["python", "./src/train.py", "-opt", config_path]
 
 	print("Spawning process: ", " ".join(cmd))
-	subprocess.run(cmd, env=os.environ.copy(), shell=True, stdout=subprocess.STDOUT, stderr=subprocess.STDOUT)
+	subprocess.run(cmd, env=os.environ.copy(), shell=True)
 	"""
 	from train import train
 	train(config)
@@ -681,7 +683,7 @@ def get_voice_list(dir=get_voice_dir()):
 	os.makedirs(dir, exist_ok=True)
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ]) + ["microphone", "random"]
 
-def export_exec_settings( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, device_override, whisper_model, sample_batch_size, concurrency_count, output_sample_rate, output_volume ):
+def export_exec_settings( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, defer_tts_load, device_override, whisper_model, sample_batch_size, concurrency_count, output_sample_rate, output_volume ):
 	global args
 
 	args.listen = listen
@@ -690,6 +692,7 @@ def export_exec_settings( listen, share, check_for_updates, models_from_local_on
 	args.models_from_local_only = models_from_local_only
 	args.low_vram = low_vram
 	args.force_cpu_for_conditioning_latents = force_cpu_for_conditioning_latents
+	args.defer_tts_load = defer_tts_load
 	args.device_override = device_override
 	args.whisper_model = whisper_model
 	args.sample_batch_size = sample_batch_size
@@ -708,6 +711,7 @@ def export_exec_settings( listen, share, check_for_updates, models_from_local_on
 		'check-for-updates':args.check_for_updates,
 		'models-from-local-only':args.models_from_local_only,
 		'force-cpu-for-conditioning-latents': args.force_cpu_for_conditioning_latents,
+		'defer-tts-load': args.defer_tts_load,
 		'device-override': args.device_override,
 		'whisper-model': args.whisper_model,
 		'sample-batch-size': args.sample_batch_size,

@@ -182,7 +182,7 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 
 def prepare_dataset_proxy( voice, language ):
 	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language )
-	
+
 def update_voices():
 	return (
 		gr.Dropdown.update(choices=get_voice_list()),
@@ -463,6 +463,7 @@ def setup_gradio():
 						gr.Checkbox(label="Voice Fixer", value=args.voice_fixer),
 						gr.Checkbox(label="Use CUDA for Voice Fixer", value=args.voice_fixer_use_cuda),
 						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
+						gr.Checkbox(label="Defer TTS Load", value=args.defer_tts_load),
 						gr.Textbox(label="Device Override", value=args.device_override),
 						gr.Dropdown(label="Whisper Model", value=args.whisper_model, choices=["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"]),
 					]

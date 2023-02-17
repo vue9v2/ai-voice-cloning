@@ -17,8 +17,9 @@ if __name__ == "__main__":
 		uvicorn.run("main:app", host=args.listen_host, port=args.listen_port if not None else 8000)
 	else:
 		webui = setup_gradio()
-		tts = setup_tortoise()
 		webui.launch(share=args.share, prevent_thread_lock=True, show_error=True, server_name=args.listen_host, server_port=args.listen_port)
+		if not args.defer_tts_load:
+			tts = setup_tortoise()
 
 		webui.block_thread()
 elif __name__ == "main":
@@ -33,4 +34,5 @@ elif __name__ == "main":
 	webui = setup_gradio()
 	app = gr.mount_gradio_app(app, webui, path=args.listen_path)
 
-	tts = setup_tortoise()
+	if not args.defer_tts_load:
+		tts = setup_tortoise()
