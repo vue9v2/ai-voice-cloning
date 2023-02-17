@@ -471,6 +471,7 @@ def prepare_dataset( files, outdir ):
 
 	idx = 0
 	results = {}
+	transcription = []
 
 	for file in files:
 		print(f"Transcribing file: {file}")
@@ -483,7 +484,6 @@ def prepare_dataset( files, outdir ):
 		waveform, sampling_rate = torchaudio.load(file)
 		num_channels, num_frames = waveform.shape
 
-		transcription = []
 		for segment in result['segments']:
 			start = int(segment['start'] * sampling_rate)
 			end = int(segment['end'] * sampling_rate)
