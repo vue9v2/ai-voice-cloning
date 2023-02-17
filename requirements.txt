@@ -1,0 +1,7 @@
+git+https://git.ecker.tech/mrq/tortoise-tts.git
+# git+https://git.ecker.tech/mrq/DL-Art-School.git
+
+whisper
+gradio
+music-tag
+voicefixer
