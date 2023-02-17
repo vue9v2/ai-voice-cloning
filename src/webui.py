@@ -123,6 +123,76 @@ def update_presets(value):
 	else:
 		return (gr.update(), gr.update())
 
+def get_training_configs():
+	configs = []
+	for i, file in enumerate(sorted(os.listdir(f"./training/"))):
+		if file[-5:] != ".yaml" or file[0] == ".":
+			continue
+		configs.append(f"./training/{file}")
+
+	return configs
+
+def update_training_configs():
+	return gr.update(choices=get_training_configs())
+
+def history_view_results( voice ):
+	results = []
+	files = []
+	outdir = f"./results/{voice}/"
+	for i, file in enumerate(sorted(os.listdir(outdir))):
+		if file[-4:] != ".wav":
+			continue
+
+		metadata, _ = read_generate_settings(f"{outdir}/{file}", read_latents=False)
+		if metadata is None:
+			continue
+			
+		values = []
+		for k in headers:
+			v = file
+			if k != "Name":
+				v = metadata[headers[k]]
+			values.append(v)
+
+
+		files.append(file)
+		results.append(values)
+
+	return (
+		results,
+		gr.Dropdown.update(choices=sorted(files))
+	)
+
+def read_generate_settings_proxy(file, saveAs='.temp'):
+	j, latents = read_generate_settings(file)
+
+	if latents:
+		outdir = f'{get_voice_dir()}/{saveAs}/'
+		os.makedirs(outdir, exist_ok=True)
+		with open(f'{outdir}/cond_latents.pth', 'wb') as f:
+			f.write(latents)
+		
+		latents = f'{outdir}/cond_latents.pth'
+
+	return (
+		j,
+		gr.update(value=latents, visible=latents is not None),
+		None if j is None else j['voice']
+	)
+
+def prepare_dataset_proxy( voice, language ):
+	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language )
+	
+def update_voices():
+	return (
+		gr.Dropdown.update(choices=get_voice_list()),
+		gr.Dropdown.update(choices=get_voice_list()),
+		gr.Dropdown.update(choices=get_voice_list("./results/")),
+	)
+
+def history_copy_settings( voice, file ):
+	return import_generate_settings( f"./results/{voice}/{file}" )
+
 def setup_gradio():
 	global args
 	global ui
@@ -279,34 +349,6 @@ def setup_gradio():
 				with gr.Column():
 					history_audio = gr.Audio()
 					history_copy_settings_button = gr.Button(value="Copy Settings")
-				
-				def history_view_results( voice ):
-					results = []
-					files = []
-					outdir = f"./results/{voice}/"
-					for i, file in enumerate(sorted(os.listdir(outdir))):
-						if file[-4:] != ".wav":
-							continue
-
-						metadata, _ = read_generate_settings(f"{outdir}/{file}", read_latents=False)
-						if metadata is None:
-							continue
-							
-						values = []
-						for k in headers:
-							v = file
-							if k != "Name":
-								v = metadata[headers[k]]
-							values.append(v)
-
-
-						files.append(file)
-						results.append(values)
-
-					return (
-						results,
-						gr.Dropdown.update(choices=sorted(files))
-					)
 
 				history_view_results_button.click(
 					fn=history_view_results,
@@ -334,23 +376,6 @@ def setup_gradio():
 				with gr.Column():
 					metadata_out = gr.JSON(label="Audio Metadata")
 					latents_out = gr.File(type="binary", label="Voice Latents")
-
-					def read_generate_settings_proxy(file, saveAs='.temp'):
-						j, latents = read_generate_settings(file)
-
-						if latents:
-							outdir = f'{get_voice_dir()}/{saveAs}/'
-							os.makedirs(outdir, exist_ok=True)
-							with open(f'{outdir}/cond_latents.pth', 'wb') as f:
-								f.write(latents)
-							
-							latents = f'{outdir}/cond_latents.pth'
-
-						return (
-							j,
-							gr.update(value=latents, visible=latents is not None),
-							None if j is None else j['voice']
-						)
 
 					audio_in.upload(
 						fn=read_generate_settings_proxy,
@@ -381,9 +406,6 @@ def setup_gradio():
 
 					with gr.Column():
 						prepare_dataset_button = gr.Button(value="Prepare")
-
-						def prepare_dataset_proxy( voice, language ):
-							return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language )
 
 						prepare_dataset_button.click(
 							prepare_dataset_proxy,
@@ -416,34 +438,12 @@ def setup_gradio():
 			with gr.Tab("Train"):
 				with gr.Row():
 					with gr.Column():
-						def get_training_configs():
-							configs = []
-							for i, file in enumerate(sorted(os.listdir(f"./training/"))):
-								if file[-5:] != ".yaml" or file[0] == ".":
-									continue
-								configs.append(f"./training/{file}")
-
-							return configs
-						def update_training_configs():
-							return gr.update(choices=get_training_configs())
-
 						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_configs())
 						refresh_configs = gr.Button(value="Refresh Configurations")
-						train = gr.Button(value="Train")
-
-					def run_training_proxy( config ):
-						global tts
-						del tts
-
-						import subprocess
-						subprocess.run(["python", "./src/train.py", "-opt", config], env=os.environ.copy(), shell=True)
-						"""
-						from train import train
-						train(config)
-						"""
+						train = gr.Button(value="Train")						
 
 					refresh_configs.click(update_training_configs,inputs=None,outputs=training_configs)
-					train.click(run_training_proxy,
+					train.click(run_training,
 						inputs=training_configs,
 						outputs=None
 					)
@@ -505,17 +505,6 @@ def setup_gradio():
 			cond_free_k,
 			experimental_checkboxes,
 		]
-
-		# YUCK
-		def update_voices():
-			return (
-				gr.Dropdown.update(choices=get_voice_list()),
-				gr.Dropdown.update(choices=get_voice_list()),
-				gr.Dropdown.update(choices=get_voice_list("./results/")),
-			)
-
-		def history_copy_settings( voice, file ):
-			return import_generate_settings( f"./results/{voice}/{file}" )
 
 		refresh_voices.click(update_voices,
 			inputs=None,

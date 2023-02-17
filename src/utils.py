@@ -24,18 +24,20 @@ import gradio.utils
 
 from datetime import datetime
 
-from tortoise.api import TextToSpeech
+from tortoise.api import TextToSpeech, MODELS, get_model_path
 from tortoise.utils.audio import load_audio, load_voice, load_voices, get_voice_dir
 from tortoise.utils.text import split_and_recombine_text
 from tortoise.utils.device import get_device_name, set_device_name
 
 import whisper
 
+MODELS['dvae.pth'] = "https://huggingface.co/jbetker/tortoise-tts-v2/resolve/3704aea61678e7e468a06d8eea121dba368a798e/.models/dvae.pth"
+
 args = None
 tts = None
 webui = None
 voicefixer = None
-dlas = None
+whisper_model = None
 
 def get_args():
 	global args
@@ -53,7 +55,7 @@ def setup_args():
 		'sample-batch-size': None,
 		'embed-output-metadata': True,
 		'latents-lean-and-mean': True,
-		'voice-fixer': False, # I'm tired of long initialization of Colab notebooks
+		'voice-fixer': True,
 		'voice-fixer-use-cuda': True,
 		'force-cpu-for-conditioning-latents': False,
 		'device-override': None,
@@ -420,22 +422,46 @@ def generate(
 		stats,
 	)
 
+def run_training(config_path):
+	global tts
+	del tts
+	tts = None
+
+	import subprocess
+	subprocess.run(["python", "./src/train.py", "-opt", config_path], env=os.environ.copy(), shell=True, stdout=subprocess.PIPE)
+	"""
+	from train import train
+	train(config)
+	"""
+
+def setup_voicefixer(restart=False):
+	global voicefixer
+	if restart:
+		del voicefixer
+		voicefixer = None
+
+	try:
+		print("Initializating voice-fixer")
+		from voicefixer import VoiceFixer
+		voicefixer = VoiceFixer()
+		print("initialized voice-fixer")
+	except Exception as e:
+		print(f"Error occurred while tring to initialize voicefixer: {e}")
+
 def setup_tortoise(restart=False):
 	global args
 	global tts
-	global voicefixer
 
 	if args.voice_fixer and not restart:
-		try:
-			from voicefixer import VoiceFixer
-			print("Initializating voice-fixer")
-			voicefixer = VoiceFixer()
-			print("initialized voice-fixer")
-		except Exception as e:
-			print(f"Error occurred while tring to initialize voicefixer: {e}")
+		setup_voicefixer(restart=restart)
+
+	if restart:
+		del tts
+		tts = None
 
 	print("Initializating TorToiSe...")
 	tts = TextToSpeech(minor_optimizations=not args.low_vram)
+	get_model_path('dvae.pth')
 	print("TorToiSe initialized, ready for generation.")
 	return tts
 
@@ -461,7 +487,6 @@ def save_training_settings( batch_size=None, learning_rate=None, print_rate=None
 	with open(f'./training/{settings["name"]}.yaml', 'w', encoding="utf-8") as f:
 		f.write(yaml)
 
-whisper_model = None
 def prepare_dataset( files, outdir, language=None ):
 	global whisper_model
 	if whisper_model is None:
@@ -641,9 +666,7 @@ def check_for_updates():
 	return False
 
 def reload_tts():
-	global tts
-	del tts
-	tts = setup_tortoise(restart=True)
+	setup_tortoise(restart=True)
 
 def cancel_generate():
 	tortoise.api.STOP_SIGNAL = True
