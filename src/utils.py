@@ -172,7 +172,7 @@ def generate(
 		progress(0, desc="Loading voice...")
 		voice_samples, conditioning_latents = load_voice(voice)
 
-	if voice_samples is not None and len(voice_samples) > 0:
+	if voice_samples and len(voice_samples) > 0:
 		sample_voice = torch.cat(voice_samples, dim=-1).squeeze().cpu()
 
 		conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, progress=progress, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents)
@@ -185,7 +185,8 @@ def generate(
 	else:
 		if conditioning_latents is not None:
 			sample_voice, _ = load_voice(voice, load_latents=False)
-			sample_voice = torch.cat(sample_voice, dim=-1).squeeze().cpu()
+			if sample_voice and len(sample_voice) > 0:
+				sample_voice = torch.cat(sample_voice, dim=-1).squeeze().cpu()
 		else:
 			sample_voice = None
 
@@ -392,7 +393,7 @@ def generate(
 			fixed_output_voices.append(fixed)
 		output_voices = fixed_output_voices
 
-	if voice is not None and conditioning_latents is not None:
+	if voice and voice != "random" and conditioning_latents is not None:
 		with open(f'{get_voice_dir()}/{voice}/cond_latents.pth', 'rb') as f:
 			info['latents'] = base64.b64encode(f.read()).decode("ascii")
 
