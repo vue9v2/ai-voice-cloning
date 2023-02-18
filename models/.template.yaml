@@ -120,7 +120,7 @@ path:
 
 # afaik all units here are measured in **steps** (i.e. one batch of batch_size is 1 unit)
 train: # CHANGEME: ALL OF THESE PARAMETERS SHOULD BE EXPERIMENTED WITH
-  niter: 50000
+  niter: ${iterations}
   warmup_iter: -1
   mega_batch_factor: 4    # <-- Gradient accumulation factor. If you are running OOM, increase this to [2,4,8].
   val_freq: 500
@@ -139,8 +139,8 @@ eval:
       out: [gen, codebook_commitment_loss]
 
 logger: 
-  print_freq: 100
-  save_checkpoint_freq: 500 # CHANGEME: especially you should increase this it's really slow
+  print_freq: ${print_rate}
+  save_checkpoint_freq: ${save_rate} # CHANGEME: especially you should increase this it's really slow
   visuals: [gen, mel]
-  visual_debug_rate: 500
+  visual_debug_rate: ${print_rate}
   is_mel_spectrogram: true

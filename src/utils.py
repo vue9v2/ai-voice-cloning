@@ -498,9 +498,10 @@ def setup_tortoise(restart=False):
 	print("TorToiSe initialized, ready for generation.")
 	return tts
 
-def save_training_settings( batch_size=None, learning_rate=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None ):
+def save_training_settings( iterations=None, batch_size=None, learning_rate=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None ):
 	settings = {
-		"batch_size": batch_size if batch_size else 128,
+		"iterations": iterations if iterations else 500,
+		"batch_size": batch_size if batch_size else 64,
 		"learning_rate": learning_rate if learning_rate else 1e-5,
 		"print_rate": print_rate if print_rate else 50,
 		"save_rate": save_rate if save_rate else 50,

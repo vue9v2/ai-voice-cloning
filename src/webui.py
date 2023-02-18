@@ -201,7 +201,7 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 def prepare_dataset_proxy( voice, language, progress=gr.Progress(track_tqdm=True) ):
 	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, progress=progress )
 
-def save_training_settings_proxy( batch_size, learning_rate, print_rate, save_rate, voice ):
+def save_training_settings_proxy( iterations, batch_size, learning_rate, print_rate, save_rate, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -217,7 +217,7 @@ def save_training_settings_proxy( batch_size, learning_rate, print_rate, save_ra
 
 	out_name = f"{voice}/train.yaml"
 
-	return save_training_settings(batch_size, learning_rate, print_rate, save_rate, name, dataset_name, dataset_path, validation_name, validation_path, out_name )
+	return save_training_settings(iterations, batch_size, learning_rate, print_rate, save_rate, name, dataset_name, dataset_path, validation_name, validation_path, out_name )
 
 def update_voices():
 	return (
@@ -346,7 +346,8 @@ def setup_gradio():
 				with gr.Row():
 					with gr.Column():
 						training_settings = [
-							gr.Slider(label="Batch Size", value=128),
+							gr.Slider(label="Iterations", minimum=0, maximum=5000, value=500),
+							gr.Slider(label="Batch Size", minimum=2, maximum=128, value=64),
 							gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6),
 							gr.Number(label="Print Frequency", value=50),
 							gr.Number(label="Save Frequency", value=50),
