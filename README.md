@@ -13,3 +13,7 @@ This is not endorsed by [neonbjb](https://github.com/neonbjb/). I do not expect 
 ## Documentation
 
 Please consult [the wiki](https://git.ecker.tech/mrq/ai-voice-cloning/wiki) for the documentation, including how to install, prepare voices for, and use the software.
+
+## Bug Reporting
+
+If you run into any problems, please refer to the [issues you may encounter](https://git.ecker.tech/mrq/ai-voice-cloning/wiki/Issues) wiki page first. Please don't hesitate to submit an issue.
