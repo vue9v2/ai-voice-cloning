@@ -450,14 +450,14 @@ def run_training(config_path):
 	buffer=[]
 	for line in iter(training_process.stdout.readline, ""):
 		buffer.append(line)
-		print(line)
+		print(line[:-1])
 		yield "".join(buffer)
 
 	training_process.stdout.close()
 	return_code = training_process.wait()
 	training_process = None
-	if return_code:
-		raise subprocess.CalledProcessError(return_code, cmd)
+	#if return_code:
+	#	raise subprocess.CalledProcessError(return_code, cmd)
 
 
 def stop_training():
