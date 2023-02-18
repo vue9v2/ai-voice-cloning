@@ -90,10 +90,8 @@ def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm
 	global tts
 	global args
 
-	try:
-		tts
-	except NameError:
-		raise gr.Error("TTS is still initializing...")
+	if not tts:
+		raise Exception("TTS is uninitialized or still initializing...")
 
 	voice_samples, conditioning_latents = load_voice(voice, load_latents=False)
 
@@ -212,6 +210,14 @@ def update_voices():
 
 def history_copy_settings( voice, file ):
 	return import_generate_settings( f"./results/{voice}/{file}" )
+
+def update_model_settings( autoregressive_model, whisper_model ):
+	if args.autoregressive_model != autoregressive_model:
+		update_autoregressive_model(autoregressive_model)
+
+	args.whisper_model = whisper_model
+
+	save_args_settings()
 
 def setup_gradio():
 	global args
@@ -370,13 +376,17 @@ def setup_gradio():
 						gr.Number(label="Concurrency Count", precision=0, value=args.concurrency_count),
 						gr.Number(label="Ouptut Sample Rate", precision=0, value=args.output_sample_rate),
 						gr.Slider(label="Ouptut Volume", minimum=0, maximum=2, value=args.output_volume),
-						gr.Dropdown(label="Whisper Model", value=args.whisper_model, choices=["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"]),
 					]
+					
+					autoregressive_model_dropdown = gr.Dropdown(get_autoregressive_models(), label="Autoregressive Model", value=args.autoregressive_model)
+					whisper_model_dropdown = gr.Dropdown(["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"], label="Whisper Model", value=args.whisper_model)
+					save_settings_button = gr.Button(value="Save Settings")
+
 					gr.Button(value="Check for Updates").click(check_for_updates)
-					gr.Button(value="Reload TTS").click(reload_tts)
+					gr.Button(value="(Re)Load TTS").click(reload_tts)
 
 				for i in exec_inputs:
-					i.change( fn=export_exec_settings, inputs=exec_inputs )
+					i.change( fn=update_args, inputs=exec_inputs )
 
 		# console_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 
@@ -531,6 +541,14 @@ def setup_gradio():
 		save_yaml_button.click(save_training_settings,
 			inputs=training_settings,
 			outputs=save_yaml_output #console_output
+		)
+
+		save_settings_button.click(update_model_settings,
+			inputs=[
+				autoregressive_model_dropdown,
+				whisper_model_dropdown,
+			],
+			outputs=None
 		)
 
 		if os.path.isfile('./config/generate.json'):
