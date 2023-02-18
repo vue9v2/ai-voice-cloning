@@ -714,7 +714,8 @@ def reload_tts():
 	setup_tortoise(restart=True)
 
 def cancel_generate():
-	tortoise.api.STOP_SIGNAL = True
+	from tortoise.api import STOP_SIGNAL
+	STOP_SIGNAL = True
 
 def get_voice_list(dir=get_voice_dir()):
 	os.makedirs(dir, exist_ok=True)
