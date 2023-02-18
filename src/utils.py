@@ -432,15 +432,19 @@ import subprocess
 
 training_process = None
 def run_training(config_path):
-	print("Unloading TTS to save VRAM.")
-	global tts
-	del tts
-	tts = None
+	try:
+		print("Unloading TTS to save VRAM.")
+		global tts
+		del tts
+		tts = None
+	except Exception as e:
+		pass
 
 	global training_process
 	torch.multiprocessing.freeze_support()
 
-	cmd = [f'train.{"bat" if args.os == "windows" else "sh"}', config_path]
+	cmd = ['call' '.\\train.bat', config_path] if os.name == "nt" else ['bash', './train.sh', config_path]
+
 	print("Spawning process: ", " ".join(cmd))
 	training_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
 	buffer=[]
