@@ -131,7 +131,7 @@ def get_training_configs():
 	return configs
 
 def update_training_configs():
-	return gr.update(choices=get_training_configs())
+	return gr.update(choices=get_training_list())
 
 history_headers = {
 	"Name": "",
@@ -200,6 +200,24 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 
 def prepare_dataset_proxy( voice, language, progress=gr.Progress(track_tqdm=True) ):
 	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, progress=progress )
+
+def save_training_settings_proxy( batch_size, learning_rate, print_rate, save_rate, voice ):
+	name = f"{voice}-finetune"
+	dataset_name = f"{voice}-train"
+	dataset_path = f"./training/{voice}/train.txt"
+	validation_name = f"{voice}-val"
+	validation_path = f"./training/{voice}/train.txt"
+
+	with open(dataset_path, 'r', encoding="utf-8") as f:
+		lines = len(f.readlines())
+
+	if batch_size > lines:
+		print("Batch size is larger than your dataset, clamping...")
+		batch_size = lines
+
+	out_name = f"{voice}/train.yaml"
+
+	return save_training_settings(batch_size, learning_rate, print_rate, save_rate, name, dataset_name, dataset_path, validation_name, validation_path, out_name )
 
 def update_voices():
 	return (
@@ -333,6 +351,12 @@ def setup_gradio():
 							gr.Number(label="Print Frequency", value=50),
 							gr.Number(label="Save Frequency", value=50),
 						]
+						dataset_list = gr.Dropdown( get_dataset_list(), label="Dataset", type="value" )
+						training_settings = training_settings + [
+							dataset_list
+						]
+						refresh_dataset_list = gr.Button(value="Refresh Dataset List")
+						"""
 						training_settings = training_settings + [
 							gr.Textbox(label="Training Name", placeholder="finetune"),
 							gr.Textbox(label="Dataset Name", placeholder="finetune"),
@@ -340,13 +364,14 @@ def setup_gradio():
 							gr.Textbox(label="Validation Name", placeholder="finetune"),
 							gr.Textbox(label="Validation Path", placeholder="./training/finetune/train.txt"),
 						]
+						"""
 					with gr.Column():
 						save_yaml_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						save_yaml_button = gr.Button(value="Save Training Configuration")
 			with gr.Tab("Run Training"):
 				with gr.Row():
 					with gr.Column():
-						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_configs())
+						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_list())
 						refresh_configs = gr.Button(value="Refresh Configurations")
 						start_training_button = gr.Button(value="Train")
 						stop_training_button = gr.Button(value="Stop")
@@ -524,7 +549,11 @@ def setup_gradio():
 			outputs=input_settings
 		)
 
-		refresh_configs.click(update_training_configs,inputs=None,outputs=training_configs)
+		refresh_configs.click(
+			lambda: gr.update(choices=get_training_list()),
+			inputs=None,
+			outputs=training_configs
+		)
 		start_training_button.click(run_training,
 			inputs=training_configs,
 			outputs=training_output #console_output
@@ -538,7 +567,12 @@ def setup_gradio():
 			inputs=dataset_settings,
 			outputs=prepare_dataset_output #console_output
 		)
-		save_yaml_button.click(save_training_settings,
+		refresh_dataset_list.click(
+			lambda: gr.update(choices=get_dataset_list()),
+			inputs=None,
+			outputs=dataset_list,
+		)
+		save_yaml_button.click(save_training_settings_proxy,
 			inputs=training_settings,
 			outputs=save_yaml_output #console_output
 		)

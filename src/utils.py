@@ -449,9 +449,9 @@ def run_training(config_path):
 	training_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
 	buffer=[]
 	for line in iter(training_process.stdout.readline, ""):
-		buffer.append(line)
-		print(line[:-1])
-		yield "".join(buffer)
+		buffer.append(f'[{datetime.now().isoformat()}] {line}')
+		print(f"[Training] {line[:-1]}")
+		yield "".join(buffer[-8:])
 
 	training_process.stdout.close()
 	return_code = training_process.wait()
@@ -498,7 +498,7 @@ def setup_tortoise(restart=False):
 	print("TorToiSe initialized, ready for generation.")
 	return tts
 
-def save_training_settings( batch_size=None, learning_rate=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None ):
+def save_training_settings( batch_size=None, learning_rate=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None ):
 	settings = {
 		"batch_size": batch_size if batch_size else 128,
 		"learning_rate": learning_rate if learning_rate else 1e-5,
@@ -510,7 +510,11 @@ def save_training_settings( batch_size=None, learning_rate=None, print_rate=None
 		"validation_name": validation_name if validation_name else "finetune",
 		"validation_path": validation_path if validation_path else "./training/finetune/train.txt",
 	}
-	outfile = f'./training/{settings["name"]}.yaml'
+
+	if not output_name:
+		output_name = f'{settings["name"]}.yaml'
+
+	outfile = f'./training/{output_name}'
 
 	with open(f'./models/.template.yaml', 'r', encoding="utf-8") as f:
 		yaml = f.read()
@@ -724,9 +728,13 @@ def get_autoregressive_models(dir="./models/finetuned/"):
 	os.makedirs(dir, exist_ok=True)
 	return [get_model_path('autoregressive.pth')] + sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
 
+def get_dataset_list(dir="./training/"):
+	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.txt" in os.listdir(os.path.join(dir, d)) ])
+
+def get_training_list(dir="./training/"):
+	return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
 
 def update_autoregressive_model(path_name):
-
 	global tts
 	if not tts:
 		raise Exception("TTS is uninitialized or still initializing...")
