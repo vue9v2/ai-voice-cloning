@@ -722,7 +722,7 @@ def get_voice_list(dir=get_voice_dir()):
 	os.makedirs(dir, exist_ok=True)
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ]) + ["microphone", "random"]
 
-def get_autoregressive_models(dir="./models/finetuned/"):
+def get_autoregressive_models(dir="./models/finetunes/"):
 	os.makedirs(dir, exist_ok=True)
 	return [get_model_path('autoregressive.pth')] + sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
 
