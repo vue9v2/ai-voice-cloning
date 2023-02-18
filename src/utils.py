@@ -265,8 +265,6 @@ def generate(
 		keys = sorted(list(idx_cache.keys()))
 		idx = keys[-1] + 1
 
-	# I know there's something to pad I don't care
-	
 	idx = pad(idx, 4)
 
 	def get_name(line=0, candidate=0, combined=False):
@@ -724,7 +722,7 @@ def get_voice_list(dir=get_voice_dir()):
 
 def get_autoregressive_models(dir="./models/finetunes/"):
 	os.makedirs(dir, exist_ok=True)
-	return [get_model_path('autoregressive.pth')] + sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
+	return [get_model_path('autoregressive.pth')] + sorted([f'{dir}/{d}' for d in os.listdir(dir) if d[-4:] == ".pth" ])
 
 def get_dataset_list(dir="./training/"):
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.txt" in os.listdir(os.path.join(dir, d)) ])
