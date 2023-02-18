@@ -86,27 +86,6 @@ def run_generation(
 		gr.update(value=stats, visible=True),
 	)
 
-def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
-	global tts
-	global args
-
-	if not tts:
-		raise Exception("TTS is uninitialized or still initializing...")
-
-	voice_samples, conditioning_latents = load_voice(voice, load_latents=False)
-
-	if voice_samples is None:
-		return
-
-	conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, progress=progress, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents)
-
-	if len(conditioning_latents) == 4:
-		conditioning_latents = (conditioning_latents[0], conditioning_latents[1], conditioning_latents[2], None)
-			
-	torch.save(conditioning_latents, f'{get_voice_dir()}/{voice}/cond_latents.pth')
-
-	return voice
-
 def update_presets(value):
 	PRESETS = {
 		'Ultra Fast': {'num_autoregressive_samples': 16, 'diffusion_iterations': 30, 'cond_free': False},
