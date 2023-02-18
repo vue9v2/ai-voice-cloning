@@ -143,7 +143,7 @@ def history_view_results( voice ):
 		for k in history_headers:
 			v = file
 			if k != "Name":
-				v = metadata[headers[k]]
+				v = metadata[history_headers[k]]
 			values.append(v)
 
 
