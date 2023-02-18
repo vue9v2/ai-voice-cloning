@@ -120,11 +120,7 @@ def setup_args():
 	return args
 
 def pad(num, zeroes):
-	s = ""
-	for i in range(zeroes,0,-1):
-		if num < 10 ** i:
-			s = f"{s}0"
-	return f"{s}{num}"
+	return str(num).zfill(zeroes+1)
 
 def generate(
 	text,
