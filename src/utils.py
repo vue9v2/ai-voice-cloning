@@ -450,6 +450,7 @@ def run_training(config_path):
 	buffer=[]
 	for line in iter(training_process.stdout.readline, ""):
 		buffer.append(line)
+		print(line)
 		yield "".join(buffer)
 
 	training_process.stdout.close()
