@@ -443,7 +443,7 @@ def run_training(config_path):
 	global training_process
 	torch.multiprocessing.freeze_support()
 
-	cmd = ['call' '.\\train.bat', config_path] if os.name == "nt" else ['bash', './train.sh', config_path]
+	cmd = ['train.bat', config_path] if os.name == "nt" else ['bash', './train.sh', config_path]
 
 	print("Spawning process: ", " ".join(cmd))
 	training_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
