@@ -135,6 +135,21 @@ def get_training_configs():
 def update_training_configs():
 	return gr.update(choices=get_training_configs())
 
+history_headers = {
+	"Name": "",
+	"Samples": "num_autoregressive_samples",
+	"Iterations": "diffusion_iterations",
+	"Temp.": "temperature",
+	"Sampler": "diffusion_sampler",
+	"CVVP": "cvvp_weight",
+	"Top P": "top_p",
+	"Diff. Temp.": "diffusion_temperature",
+	"Len Pen": "length_penalty",
+	"Rep Pen": "repetition_penalty",
+	"Cond-Free K": "cond_free_k",
+	"Time": "time",
+}
+
 def history_view_results( voice ):
 	results = []
 	files = []
@@ -148,7 +163,7 @@ def history_view_results( voice ):
 			continue
 			
 		values = []
-		for k in headers:
+		for k in history_headers:
 			v = file
 			if k != "Name":
 				v = metadata[headers[k]]
@@ -163,6 +178,10 @@ def history_view_results( voice ):
 		gr.Dropdown.update(choices=sorted(files))
 	)
 
+def import_voices_proxy(files, name, progress=gr.Progress(track_tqdm=True)):
+	import_voices(files, name, progress)
+	return gr.update()
+
 def read_generate_settings_proxy(file, saveAs='.temp'):
 	j, latents = read_generate_settings(file)
 
@@ -175,13 +194,14 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 		latents = f'{outdir}/cond_latents.pth'
 
 	return (
-		j,
+		gr.update(value=j, visible=j is not None),
+		gr.update(visible=j is not None),
 		gr.update(value=latents, visible=latents is not None),
 		None if j is None else j['voice']
 	)
 
-def prepare_dataset_proxy( voice, language ):
-	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language )
+def prepare_dataset_proxy( voice, language, progress=gr.Progress(track_tqdm=True) ):
+	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, progress=progress )
 
 def update_voices():
 	return (
@@ -222,52 +242,18 @@ def setup_gradio():
 				with gr.Column():
 					delimiter = gr.Textbox(lines=1, label="Line Delimiter", placeholder="\\n")
 
-					emotion = gr.Radio(
-						["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom"],
-						value="Custom",
-						label="Emotion",
-						type="value",
-						interactive=True
-					)
+					emotion = gr.Radio( ["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom"], value="Custom", label="Emotion", type="value", interactive=True )
 					prompt = gr.Textbox(lines=1, label="Custom Emotion + Prompt (if selected)")
-					voice = gr.Dropdown(
-						get_voice_list(),
-						label="Voice",
-						type="value",
-					)
-					mic_audio = gr.Audio(
-						label="Microphone Source",
-						source="microphone",
-						type="filepath",
-					)
+					voice = gr.Dropdown(get_voice_list(), label="Voice", type="value")
+					mic_audio = gr.Audio( label="Microphone Source", source="microphone", type="filepath" )
 					refresh_voices = gr.Button(value="Refresh Voice List")
 					voice_latents_chunks = gr.Slider(label="Voice Chunks", minimum=1, maximum=64, value=1, step=1)
 					recompute_voice_latents = gr.Button(value="(Re)Compute Voice Latents")
-					recompute_voice_latents.click(compute_latents,
-						inputs=[
-							voice,
-							voice_latents_chunks,
-						],
-						outputs=voice,
-					)
-					
-					prompt.change(fn=lambda value: gr.update(value="Custom"),
-						inputs=prompt,
-						outputs=emotion
-					)
-					mic_audio.change(fn=lambda value: gr.update(value="microphone"),
-						inputs=mic_audio,
-						outputs=voice
-					)
 				with gr.Column():
 					candidates = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates")
 					seed = gr.Number(value=0, precision=0, label="Seed")
 
-					preset = gr.Radio(
-						["Ultra Fast", "Fast", "Standard", "High Quality"],
-						label="Preset",
-						type="value",
-					)
+					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value" )
 					num_autoregressive_samples = gr.Slider(value=128, minimum=0, maximum=512, step=1, label="Samples")
 					diffusion_iterations = gr.Slider(value=128, minimum=0, maximum=512, step=1, label="Iterations")
 
@@ -275,19 +261,7 @@ def setup_gradio():
 					breathing_room = gr.Slider(value=8, minimum=1, maximum=32, step=1, label="Pause Size")
 					diffusion_sampler = gr.Radio(
 						["P", "DDIM"], # + ["K_Euler_A", "DPM++2M"],
-						value="P",
-						label="Diffusion Samplers",
-						type="value",
-					)
-
-					preset.change(fn=update_presets,
-						inputs=preset,
-						outputs=[
-							num_autoregressive_samples,
-							diffusion_iterations,
-						],
-					)
-
+						value="P", label="Diffusion Samplers", type="value" )
 					show_experimental_settings = gr.Checkbox(label="Show Experimental Settings")
 					reset_generation_settings_button = gr.Button(value="Reset to Default")
 				with gr.Column(visible=False) as col:
@@ -300,12 +274,6 @@ def setup_gradio():
 					length_penalty = gr.Slider(value=1.0, minimum=0, maximum=8, label="Length Penalty")
 					repetition_penalty = gr.Slider(value=2.0, minimum=0, maximum=8, label="Repetition Penalty")
 					cond_free_k = gr.Slider(value=2.0, minimum=0, maximum=4, label="Conditioning-Free K")
-
-					show_experimental_settings.change(
-						fn=lambda x: gr.update(visible=x),
-						inputs=show_experimental_settings,
-						outputs=experimental_column
-					)
 				with gr.Column():
 					submit = gr.Button(value="Generate")
 					stop = gr.Button(value="Stop")
@@ -315,33 +283,13 @@ def setup_gradio():
 					output_audio = gr.Audio(label="Output")
 					candidates_list = gr.Dropdown(label="Candidates", type="value", visible=False)
 					output_pick = gr.Button(value="Select Candidate", visible=False)
-					
 		with gr.Tab("History"):
 			with gr.Row():
 				with gr.Column():
-					headers = {
-						"Name": "",
-						"Samples": "num_autoregressive_samples",
-						"Iterations": "diffusion_iterations",
-						"Temp.": "temperature",
-						"Sampler": "diffusion_sampler",
-						"CVVP": "cvvp_weight",
-						"Top P": "top_p",
-						"Diff. Temp.": "diffusion_temperature",
-						"Len Pen": "length_penalty",
-						"Rep Pen": "repetition_penalty",
-						"Cond-Free K": "cond_free_k",
-						"Time": "time",
-					}
-					history_info = gr.Dataframe(label="Results", headers=list(headers.keys()))
+					history_info = gr.Dataframe(label="Results", headers=list(history_headers.keys()))
 			with gr.Row():
 				with gr.Column():
-					history_voices = gr.Dropdown(
-						get_voice_list("./results/"),
-						label="Voice",
-						type="value",
-					)
-
+					history_voices = gr.Dropdown(choices=get_voice_list("./results/"), label="Voice", type="value")
 					history_view_results_button = gr.Button(value="View Files")
 				with gr.Column():
 					history_results_list = gr.Dropdown(label="Results",type="value", interactive=True)
@@ -349,51 +297,16 @@ def setup_gradio():
 				with gr.Column():
 					history_audio = gr.Audio()
 					history_copy_settings_button = gr.Button(value="Copy Settings")
-
-				history_view_results_button.click(
-					fn=history_view_results,
-					inputs=history_voices,
-					outputs=[
-						history_info,
-						history_results_list,
-					]
-				)
-				history_view_result_button.click(
-					fn=lambda voice, file: f"./results/{voice}/{file}",
-					inputs=[
-						history_voices,
-						history_results_list,
-					],
-					outputs=history_audio
-				)
 		with gr.Tab("Utilities"):
 			with gr.Row():
 				with gr.Column():
-					audio_in = gr.File(type="file", label="Audio Input", file_types=["audio"])
-					copy_button = gr.Button(value="Copy Settings")
+					audio_in = gr.Files(type="file", label="Audio Input", file_types=["audio"])
 					import_voice_name = gr.Textbox(label="Voice Name")
 					import_voice_button = gr.Button(value="Import Voice")
 				with gr.Column():
-					metadata_out = gr.JSON(label="Audio Metadata")
-					latents_out = gr.File(type="binary", label="Voice Latents")
-
-					audio_in.upload(
-						fn=read_generate_settings_proxy,
-						inputs=audio_in,
-						outputs=[
-							metadata_out,
-							latents_out,
-							import_voice_name
-						]
-					)
-
-				import_voice_button.click(
-					fn=import_voice,
-					inputs=[
-						audio_in,
-						import_voice_name,
-					]
-				)
+					metadata_out = gr.JSON(label="Audio Metadata", visible=False)
+					copy_button = gr.Button(value="Copy Settings", visible=False)
+					latents_out = gr.File(type="binary", label="Voice Latents", visible=False)
 		with gr.Tab("Training"):
 			with gr.Tab("Prepare Dataset"):
 				with gr.Row():
@@ -402,16 +315,9 @@ def setup_gradio():
 							gr.Dropdown( get_voice_list(), label="Dataset Source", type="value" ),
 							gr.Textbox(label="Language", placeholder="English")
 						]
-						dataset_voices = dataset_settings[0]
-
-					with gr.Column():
 						prepare_dataset_button = gr.Button(value="Prepare")
-
-						prepare_dataset_button.click(
-							prepare_dataset_proxy,
-							inputs=dataset_settings,
-							outputs=None
-						)
+					with gr.Column():
+						prepare_dataset_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 			with gr.Tab("Generate Configuration"):
 				with gr.Row():
 					with gr.Column():
@@ -421,8 +327,6 @@ def setup_gradio():
 							gr.Number(label="Print Frequency", value=50),
 							gr.Number(label="Save Frequency", value=50),
 						]
-						save_yaml_button = gr.Button(value="Save Training Configuration")
-					with gr.Column():
 						training_settings = training_settings + [
 							gr.Textbox(label="Training Name", placeholder="finetune"),
 							gr.Textbox(label="Dataset Name", placeholder="finetune"),
@@ -430,24 +334,18 @@ def setup_gradio():
 							gr.Textbox(label="Validation Name", placeholder="finetune"),
 							gr.Textbox(label="Validation Path", placeholder="./training/finetune/train.txt"),
 						]
-
-						save_yaml_button.click(save_training_settings,
-							inputs=training_settings,
-							outputs=None
-						)
-			with gr.Tab("Train"):
+					with gr.Column():
+						save_yaml_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
+						save_yaml_button = gr.Button(value="Save Training Configuration")
+			with gr.Tab("Run Training"):
 				with gr.Row():
 					with gr.Column():
 						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_configs())
 						refresh_configs = gr.Button(value="Refresh Configurations")
-						train = gr.Button(value="Train")						
-
-					refresh_configs.click(update_training_configs,inputs=None,outputs=training_configs)
-					train.click(run_training,
-						inputs=training_configs,
-						outputs=None
-					)
-
+						start_training_button = gr.Button(value="Train")
+						stop_training_button = gr.Button(value="Stop")
+					with gr.Column():
+						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 		with gr.Tab("Settings"):
 			with gr.Row():
 				exec_inputs = []
@@ -465,23 +363,22 @@ def setup_gradio():
 						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
 						gr.Checkbox(label="Defer TTS Load", value=args.defer_tts_load),
 						gr.Textbox(label="Device Override", value=args.device_override),
-						gr.Dropdown(label="Whisper Model", value=args.whisper_model, choices=["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"]),
 					]
-					gr.Button(value="Check for Updates").click(check_for_updates)
-					gr.Button(value="Reload TTS").click(reload_tts)
 				with gr.Column():
 					exec_inputs = exec_inputs + [
 						gr.Number(label="Sample Batch Size", precision=0, value=args.sample_batch_size),
 						gr.Number(label="Concurrency Count", precision=0, value=args.concurrency_count),
 						gr.Number(label="Ouptut Sample Rate", precision=0, value=args.output_sample_rate),
 						gr.Slider(label="Ouptut Volume", minimum=0, maximum=2, value=args.output_volume),
+						gr.Dropdown(label="Whisper Model", value=args.whisper_model, choices=["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"]),
 					]
+					gr.Button(value="Check for Updates").click(check_for_updates)
+					gr.Button(value="Reload TTS").click(reload_tts)
 
 				for i in exec_inputs:
-					i.change(
-						fn=export_exec_settings,
-						inputs=exec_inputs
-					)
+					i.change( fn=export_exec_settings, inputs=exec_inputs )
+
+		# console_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 
 		input_settings = [
 			text,
@@ -507,11 +404,76 @@ def setup_gradio():
 			experimental_checkboxes,
 		]
 
+		history_view_results_button.click(
+			fn=history_view_results,
+			inputs=history_voices,
+			outputs=[
+				history_info,
+				history_results_list,
+			]
+		)
+		history_view_result_button.click(
+			fn=lambda voice, file: f"./results/{voice}/{file}",
+			inputs=[
+				history_voices,
+				history_results_list,
+			],
+			outputs=history_audio
+		)
+		audio_in.upload(
+			fn=read_generate_settings_proxy,
+			inputs=audio_in,
+			outputs=[
+				metadata_out,
+				copy_button,
+				latents_out,
+				import_voice_name
+			]
+		)
+
+		import_voice_button.click(
+			fn=import_voices_proxy,
+			inputs=[
+				audio_in,
+				import_voice_name,
+			],
+			outputs=import_voice_name #console_output
+		)
+		show_experimental_settings.change(
+			fn=lambda x: gr.update(visible=x),
+			inputs=show_experimental_settings,
+			outputs=experimental_column
+		)
+		preset.change(fn=update_presets,
+			inputs=preset,
+			outputs=[
+				num_autoregressive_samples,
+				diffusion_iterations,
+			],
+		)
+
+		recompute_voice_latents.click(compute_latents,
+			inputs=[
+				voice,
+				voice_latents_chunks,
+			],
+			outputs=voice,
+		)
+		
+		prompt.change(fn=lambda value: gr.update(value="Custom"),
+			inputs=prompt,
+			outputs=emotion
+		)
+		mic_audio.change(fn=lambda value: gr.update(value="microphone"),
+			inputs=mic_audio,
+			outputs=voice
+		)
+
 		refresh_voices.click(update_voices,
 			inputs=None,
 			outputs=[
 				voice,
-				dataset_voices,
+				dataset_settings[0],
 				history_voices
 			]
 		)
@@ -550,6 +512,25 @@ def setup_gradio():
 				history_results_list,
 			],
 			outputs=input_settings
+		)
+
+		refresh_configs.click(update_training_configs,inputs=None,outputs=training_configs)
+		start_training_button.click(run_training,
+			inputs=training_configs,
+			outputs=training_output #console_output
+		)
+		stop_training_button.click(stop_training,
+			inputs=None,
+			outputs=training_output #console_output
+		)
+		prepare_dataset_button.click(
+			prepare_dataset_proxy,
+			inputs=dataset_settings,
+			outputs=prepare_dataset_output #console_output
+		)
+		save_yaml_button.click(save_training_settings,
+			inputs=training_settings,
+			outputs=save_yaml_output #console_output
 		)
 
 		if os.path.isfile('./config/generate.json'):

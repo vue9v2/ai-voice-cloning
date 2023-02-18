@@ -1,5 +1,4 @@
 import os
-
 if 'XDG_CACHE_HOME' not in os.environ:
 	os.environ['XDG_CACHE_HOME'] = os.path.realpath(os.path.join(os.getcwd(), './models/'))
 
@@ -15,7 +14,9 @@ import json
 import base64
 import re
 import urllib.request
+import signal
 
+import tqdm
 import torch
 import torchaudio
 import music_tag
@@ -90,6 +91,8 @@ def setup_args():
 	parser.add_argument("--concurrency-count", type=int, default=default_arguments['concurrency-count'], help="How many Gradio events to process at once")
 	parser.add_argument("--output-sample-rate", type=int, default=default_arguments['output-sample-rate'], help="Sample rate to resample the output to (from 24KHz)")
 	parser.add_argument("--output-volume", type=float, default=default_arguments['output-volume'], help="Adjusts volume of output")
+	
+	parser.add_argument("--os", default="unix", help="Specifies which OS, easily")
 	args = parser.parse_args()
 
 	args.embed_output_metadata = not args.no_embed_output_metadata
@@ -427,20 +430,37 @@ def generate(
 
 import subprocess
 
+training_process = None
 def run_training(config_path):
 	print("Unloading TTS to save VRAM.")
 	global tts
 	del tts
 	tts = None
 
-	cmd = ["python", "./src/train.py", "-opt", config_path]
+	global training_process
+	torch.multiprocessing.freeze_support()
 
+	cmd = [f'train.{"bat" if args.os == "windows" else "sh"}', config_path]
 	print("Spawning process: ", " ".join(cmd))
-	subprocess.run(cmd, env=os.environ.copy(), shell=True)
-	"""
-	from train import train
-	train(config)
-	"""
+	training_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+	buffer=[]
+	for line in iter(training_process.stdout.readline, ""):
+		buffer.append(line)
+		yield "".join(buffer)
+
+	training_process.stdout.close()
+	return_code = training_process.wait()
+	training_process = None
+	if return_code:
+		raise subprocess.CalledProcessError(return_code, cmd)
+
+
+def stop_training():
+	if training_process is None:
+		return "No training in progress"
+	training_process.kill()
+	training_process = None
+	return "Training cancelled"
 
 def setup_voicefixer(restart=False):
 	global voicefixer
@@ -485,19 +505,23 @@ def save_training_settings( batch_size=None, learning_rate=None, print_rate=None
 		"validation_name": validation_name if validation_name else "finetune",
 		"validation_path": validation_path if validation_path else "./training/finetune/train.txt",
 	}
+	outfile = f'./training/{settings["name"]}.yaml'
 
-	with open(f'./training/.template.yaml', 'r', encoding="utf-8") as f:
+	with open(f'./models/.template.yaml', 'r', encoding="utf-8") as f:
 		yaml = f.read()
 
 	for k in settings:
 		yaml = yaml.replace(f"${{{k}}}", str(settings[k]))
-	
-	with open(f'./training/{settings["name"]}.yaml', 'w', encoding="utf-8") as f:
+
+	with open(outfile, 'w', encoding="utf-8") as f:
 		f.write(yaml)
 
-def prepare_dataset( files, outdir, language=None ):
+	return f"Training settings saved to: {outfile}"
+
+def prepare_dataset( files, outdir, language=None, progress=None ):
 	global whisper_model
 	if whisper_model is None:
+		notify_progress(f"Loading Whisper model: {args.whisper_model}", progress)
 		whisper_model = whisper.load_model(args.whisper_model)
 
 	os.makedirs(outdir, exist_ok=True)
@@ -506,7 +530,7 @@ def prepare_dataset( files, outdir, language=None ):
 	results = {}
 	transcription = []
 
-	for file in files:
+	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
 		print(f"Transcribing file: {file}")
 		
 		result = whisper_model.transcribe(file, language=language if language else "English")
@@ -517,7 +541,7 @@ def prepare_dataset( files, outdir, language=None ):
 		waveform, sampling_rate = torchaudio.load(file)
 		num_channels, num_frames = waveform.shape
 
-		for segment in result['segments']:
+		for segment in result['segments']: # enumerate_progress(result['segments'], desc="Segmenting voice file", progress=progress):
 			start = int(segment['start'] * sampling_rate)
 			end = int(segment['end'] * sampling_rate)
 
@@ -535,66 +559,74 @@ def prepare_dataset( files, outdir, language=None ):
 	with open(f'{outdir}/train.txt', 'w', encoding="utf-8") as f:
 		f.write("\n".join(transcription))
 
+	return f"Processed dataset to: {outdir}"
+
 def reset_generation_settings():
 	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps({}, indent='\t') )
 	return import_generate_settings()
 
-def import_voice(file, saveAs = None):
+def import_voices(files, saveAs=None, progress=None):
 	global args
 
-	j, latents = read_generate_settings(file, read_latents=True)
-	
-	if j is not None and saveAs is None:
-		saveAs = j['voice']
-	if saveAs is None or saveAs == "":
-		raise Exception("Specify a voice name")
+	if not isinstance(files, list):
+		files = [files]
 
-	outdir = f'{get_voice_dir()}/{saveAs}/'
-	os.makedirs(outdir, exist_ok=True)
-	if latents:
-		with open(f'{outdir}/cond_latents.pth', 'wb') as f:
-			f.write(latents)
-		latents = f'{outdir}/cond_latents.pth'
-		print(f"Imported latents to {latents}")
-	else:
-		filename = file.name
-		if filename[-4:] != ".wav":
-			raise Exception("Please convert to a WAV first")
+	for file in enumerate_progress(files, desc="Importing voice files", progress=progress):
+		j, latents = read_generate_settings(file, read_latents=True)
+		
+		if j is not None and saveAs is None:
+			saveAs = j['voice']
+		if saveAs is None or saveAs == "":
+			raise Exception("Specify a voice name")
 
-		path = f"{outdir}/{os.path.basename(filename)}"
-		waveform, sampling_rate = torchaudio.load(filename)
+		outdir = f'{get_voice_dir()}/{saveAs}/'
+		os.makedirs(outdir, exist_ok=True)
 
-		if args.voice_fixer and voicefixer is not None:
-			# resample to best bandwidth since voicefixer will do it anyways through librosa
-			if sampling_rate != 44100:
-				print(f"Resampling imported voice sample: {path}")
-				resampler = torchaudio.transforms.Resample(
-					sampling_rate,
-					44100,
-					lowpass_filter_width=16,
-					rolloff=0.85,
-					resampling_method="kaiser_window",
-					beta=8.555504641634386,
-				)
-				waveform = resampler(waveform)
-				sampling_rate = 44100
-
-			torchaudio.save(path, waveform, sampling_rate)
-
-			print(f"Running 'voicefixer' on voice sample: {path}")
-			voicefixer.restore(
-				input = path,
-				output = path,
-				cuda=get_device_name() == "cuda" and args.voice_fixer_use_cuda,
-				#mode=mode,
-			)
+		if latents:
+			print(f"Importing latents to {latents}")
+			with open(f'{outdir}/cond_latents.pth', 'wb') as f:
+				f.write(latents)
+			latents = f'{outdir}/cond_latents.pth'
+			print(f"Imported latents to {latents}")
 		else:
-			torchaudio.save(path, waveform, sampling_rate)
+			filename = file.name
+			if filename[-4:] != ".wav":
+				raise Exception("Please convert to a WAV first")
 
+			path = f"{outdir}/{os.path.basename(filename)}"
+			print(f"Importing voice to {path}")
 
-		print(f"Imported voice to {path}")
+			waveform, sampling_rate = torchaudio.load(filename)
 
+			if args.voice_fixer and voicefixer is not None:
+				# resample to best bandwidth since voicefixer will do it anyways through librosa
+				if sampling_rate != 44100:
+					print(f"Resampling imported voice sample: {path}")
+					resampler = torchaudio.transforms.Resample(
+						sampling_rate,
+						44100,
+						lowpass_filter_width=16,
+						rolloff=0.85,
+						resampling_method="kaiser_window",
+						beta=8.555504641634386,
+					)
+					waveform = resampler(waveform)
+					sampling_rate = 44100
+
+				torchaudio.save(path, waveform, sampling_rate)
+
+				print(f"Running 'voicefixer' on voice sample: {path}")
+				voicefixer.restore(
+					input = path,
+					output = path,
+					cuda=get_device_name() == "cuda" and args.voice_fixer_use_cuda,
+					#mode=mode,
+				)
+			else:
+				torchaudio.save(path, waveform, sampling_rate)
+
+			print(f"Imported voice to {path}")
 
 def import_generate_settings(file="./config/generate.json"):
 	settings, _ = read_generate_settings(file, read_latents=False)
@@ -760,3 +792,20 @@ def read_generate_settings(file, read_latents=True, read_json=True):
 		j,
 		latents,
 	)
+
+def enumerate_progress(iterable, desc=None, progress=None, verbose=None):
+	if verbose and desc is not None:
+		print(desc)
+
+	if progress is None:
+		return tqdm(iterable, disable=not verbose)
+	return progress.tqdm(iterable, desc=f'{progress.msg_prefix} {desc}' if hasattr(progress, 'msg_prefix') else desc, track_tqdm=True)
+
+def notify_progress(message, progress=None, verbose=True):
+	if verbose:
+		print(message)
+
+	if progress is None:
+		return
+
+	progress(0, desc=message)
