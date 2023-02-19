@@ -212,6 +212,10 @@ def save_training_settings_proxy( epochs, batch_size, learning_rate, learning_ra
 	print_rate = int(print_rate * iterations / epochs)
 	save_rate = int(save_rate * iterations / epochs)
 
+	if not learning_rate_schedule:
+		learning_rate_schedule = EPOCH_SCHEDULE
+	learning_rate_schedule = schedule_learning_rate( iterations / epochs )
+
 	messages.append(save_training_settings(
 		iterations=iterations,
 		batch_size=batch_size,
@@ -355,8 +359,8 @@ def setup_gradio():
 				with gr.Row():
 					with gr.Column():
 						training_settings = [
-							gr.Number(label="Epochs", value=10, precision=0),
-							gr.Number(label="Batch Size", value=64, precision=0),
+							gr.Number(label="Epochs", value=500, precision=0),
+							gr.Number(label="Batch Size", value=128, precision=0),
 							gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6),
 							gr.Textbox(label="Learning Rate Schedule", placeholder=str(EPOCH_SCHEDULE)),
 							gr.Number(label="Mega Batch Factor", value=4, precision=0),
@@ -384,13 +388,13 @@ def setup_gradio():
 				with gr.Row():
 					with gr.Column():
 						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_list())
-						verbose_training = gr.Checkbox(label="Verbose Training")
-						training_buffer_size = gr.Slider(label="Buffer Size", minimum=4, maximum=32, value=8)
 						refresh_configs = gr.Button(value="Refresh Configurations")
 						start_training_button = gr.Button(value="Train")
 						stop_training_button = gr.Button(value="Stop")
 					with gr.Column():
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
+						verbose_training = gr.Checkbox(label="Verbose Console Output")
+						training_buffer_size = gr.Slider(label="Console Buffer Size", minimum=4, maximum=32, value=8)
 		with gr.Tab("Settings"):
 			with gr.Row():
 				exec_inputs = []
