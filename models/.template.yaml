@@ -114,19 +114,19 @@ networks:
       #only_alignment_head: False  # uv3/4
 
 path:
-  pretrain_model_gpt: './models/tortoise/autoregressive.pth' # CHANGEME: copy this from tortoise cache
+  ${pretrain_model_gpt} 
   strict_load: true
-  #resume_state: ./models/tortoise/train_imgnet_vqvae_stage1/training_state/0.state   # <-- Set this to resume from a previous training state.
+  ${resume_state}
 
 # afaik all units here are measured in **steps** (i.e. one batch of batch_size is 1 unit)
 train: # CHANGEME: ALL OF THESE PARAMETERS SHOULD BE EXPERIMENTED WITH
   niter: ${iterations}
   warmup_iter: -1
-  mega_batch_factor: 4    # <-- Gradient accumulation factor. If you are running OOM, increase this to [2,4,8].
-  val_freq: 500
+  mega_batch_factor: ${mega_batch_factor} # <-- Gradient accumulation factor. If you are running OOM, increase this to [2,4,8].
+  val_freq: ${iterations}
 
   default_lr_scheme: MultiStepLR
-  gen_lr_steps: [500, 1000, 1400, 1800] #[50000, 100000, 140000, 180000]
+  gen_lr_steps: ${gen_lr_steps} #[50000, 100000, 140000, 180000]
   lr_gamma: 0.5
 
 eval:

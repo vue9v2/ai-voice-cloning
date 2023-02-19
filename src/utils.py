@@ -580,11 +580,13 @@ def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm
 
 	return voice
 
-def save_training_settings( iterations=None, batch_size=None, learning_rate=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None ):
+def save_training_settings( iterations=None, batch_size=None, learning_rate=None, learning_rate_schedule=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None ):
 	settings = {
 		"iterations": iterations if iterations else 500,
 		"batch_size": batch_size if batch_size else 64,
 		"learning_rate": learning_rate if learning_rate else 1e-5,
+		"gen_lr_steps": learning_rate_schedule if learning_rate_schedule else [ 200, 300, 400, 500 ],
+		"mega_batch_factor": mega_batch_factor if mega_batch_factor else 4,
 		"print_rate": print_rate if print_rate else 50,
 		"save_rate": save_rate if save_rate else 50,
 		"name": name if name else "finetune",
@@ -592,19 +594,25 @@ def save_training_settings( iterations=None, batch_size=None, learning_rate=None
 		"dataset_path": dataset_path if dataset_path else "./training/finetune/train.txt",
 		"validation_name": validation_name if validation_name else "finetune",
 		"validation_path": validation_path if validation_path else "./training/finetune/train.txt",
+
+		'resume_state': f"resume_state: '{resume_path}'" if resume_path else f"# resume_state: './training/{name if name else 'finetune'}/training_state/#.state'",
+		'pretrain_model_gpt': "pretrain_model_gpt: './models/tortoise/autoregressive.pth'" if not resume_path else "# pretrain_model_gpt: './models/tortoise/autoregressive.pth'"
 	}
 
 	if not output_name:
 		output_name = f'{settings["name"]}.yaml'
 
-	outfile = f'./training/{output_name}'
 
 	with open(f'./models/.template.yaml', 'r', encoding="utf-8") as f:
 		yaml = f.read()
 
+	# i could just load and edit the YAML directly, but this is easier, as I don't need to bother with path traversals
 	for k in settings:
+		if settings[k] is None:
+			continue
 		yaml = yaml.replace(f"${{{k}}}", str(settings[k]))
 
+	outfile = f'./training/{output_name}'
 	with open(outfile, 'w', encoding="utf-8") as f:
 		f.write(yaml)
 
