@@ -465,7 +465,7 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 	its = config['train']['niter']
 
 	checkpoint = 0
-	checkpoints = config['logger']['save_checkpoint_freq']
+	checkpoints = config['logger']['save_checkpoint_freq'] / its
 
 	buffer_size = 8
 	open_state = False
@@ -497,7 +497,7 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 				progress(checkpoint / float(checkpoints), f'[{checkpoint}/{checkpoints}] Saving checkpoint...')
 
 		print(f"[Training] [{datetime.now().isoformat()}] {line[:-1]}")
-		
+
 		if verbose:
 			yield "".join(buffer[-buffer_size:])
 
