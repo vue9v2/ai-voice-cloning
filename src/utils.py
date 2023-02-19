@@ -580,6 +580,63 @@ def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm
 
 	return voice
 
+def calc_iterations( epochs, lines, batch_size ):
+	iterations = int(epochs * lines / float(batch_size))
+	return iterations
+
+def schedule_learning_rate( iterations ):
+	schedule = [ 9, 18, 25, 33 ]
+	return [int(iterations * d) for d in schedule]
+
+def optimize_training_settings( epochs, batch_size, learning_rate, learning_rate_schedule, mega_batch_factor, print_rate, save_rate, resume_path, voice ):
+	name = f"{voice}-finetune"
+	dataset_name = f"{voice}-train"
+	dataset_path = f"./training/{voice}/train.txt"
+	validation_name = f"{voice}-val"
+	validation_path = f"./training/{voice}/train.txt"
+
+	with open(dataset_path, 'r', encoding="utf-8") as f:
+		lines = len(f.readlines())
+
+	messages = []
+
+	if batch_size > lines:
+		batch_size = lines
+		messages.append(f"Batch size is larger than your dataset, clamping batch size to: {batch_size}")	
+
+	if batch_size / mega_batch_factor < 2:
+		mega_batch_factor = int(batch_size / 2)
+		messages.append(f"Mega batch factor is too large for the given batch size, clamping mega batch factor to: {mega_batch_factor}")
+
+	iterations = calc_iterations(epochs=epochs, lines=lines, batch_size=batch_size)
+	messages.append(f"For {epochs} epochs with {lines} lines, iterating for {iterations} steps")
+
+	if iterations < print_rate:
+		print_rate = iterations
+		messages.append(f"Print rate is too small for the given iteration step, clamping print rate to: {print_rate}")
+	
+	if iterations < save_rate:
+		save_rate = iterations
+		messages.append(f"Save rate is too small for the given iteration step, clamping save rate to: {save_rate}")
+
+	if resume_path and not os.path.exists(resume_path):
+		resume_path = None
+		messages.append("Resume path specified, but does not exist. Disabling...")
+
+	learning_rate_schedule = schedule_learning_rate( iterations / epochs ) # faster learning schedule compared to just passing lines / batch_size due to truncating
+	messages.append(f"Suggesting best learning rate schedule for iterations: {learning_rate_schedule}")
+
+	return (
+		batch_size,
+		learning_rate,
+		learning_rate_schedule,
+		mega_batch_factor,
+		print_rate,
+		save_rate,
+		resume_path,
+		messages
+	)
+
 def save_training_settings( iterations=None, batch_size=None, learning_rate=None, learning_rate_schedule=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None ):
 	settings = {
 		"iterations": iterations if iterations else 500,
