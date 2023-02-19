@@ -196,6 +196,7 @@ def save_training_settings_proxy( iterations, batch_size, learning_rate, learnin
 		batch_size = lines
 		messages.append(f"Batch size is larger than your dataset, clamping batch size to: {batch_size}")
 	
+
 	if batch_size / mega_batch_factor < 2:
 		mega_batch_factor = int(batch_size / 2)
 		messages.append(f"Mega batch factor is too large for the given batch size, clamping mega batch factor to: {mega_batch_factor}")
@@ -358,7 +359,7 @@ def setup_gradio():
 							gr.Slider(label="Batch Size", minimum=2, maximum=128, value=64),
 							gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6),
 							gr.Textbox(label="Learning Rate Schedule", placeholder="[ 200, 300, 400, 500 ]"),
-							gr.Slider(label="Mega Batch Factor", minimum=1, maximum=16, value=4),
+							gr.Slider(label="Mega Batch Factor", minimum=1, maximum=16, value=4, step=1),
 							gr.Number(label="Print Frequency", value=50),
 							gr.Number(label="Save Frequency", value=50),
 							gr.Textbox(label="Resume State Path", placeholder="./training/${voice}-finetune/training_state/${last_state}.state"),
