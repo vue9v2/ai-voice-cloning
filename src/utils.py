@@ -496,8 +496,9 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 				checkpoint = checkpoint + 1
 				progress(checkpoint / float(checkpoints), f'[{checkpoint}/{checkpoints}] Saving checkpoint...')
 
+		print(f"[Training] [{datetime.now().isoformat()}] {line[:-1]}")
+		
 		if verbose:
-			print(f"[Training] [{datetime.now().isoformat()}] {line[:-1]}")
 			yield "".join(buffer[-buffer_size:])
 
 	training_process.stdout.close()
