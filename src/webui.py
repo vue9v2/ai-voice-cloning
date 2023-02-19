@@ -209,10 +209,8 @@ def history_copy_settings( voice, file ):
 	return import_generate_settings( f"./results/{voice}/{file}" )
 
 def update_model_settings( autoregressive_model, whisper_model ):
-	if args.autoregressive_model != autoregressive_model:
-		update_autoregressive_model(autoregressive_model)
-
-	args.whisper_model = whisper_model
+	update_autoregressive_model(autoregressive_model)
+	update_whisper_model(whisper_model)
 
 	save_args_settings()
 

@@ -765,6 +765,17 @@ def get_dataset_list(dir="./training/"):
 def get_training_list(dir="./training/"):
 	return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
 
+def update_whisper_model(name):
+	global whisper_model
+	if whisper_model:
+		del whisper_model
+		whisper_model = None
+	
+	args.whisper_model = name
+
+	print(f"Loading Whisper model: {args.whisper_model}")
+	whisper_model = whisper.load_model(args.whisper_model)
+
 def update_autoregressive_model(path_name):
 	global tts
 	if not tts:
