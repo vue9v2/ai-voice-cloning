@@ -584,9 +584,9 @@ def calc_iterations( epochs, lines, batch_size ):
 	iterations = int(epochs * lines / float(batch_size))
 	return iterations
 
+EPOCH_SCHEDULE = [ 9, 18, 25, 33 ]
 def schedule_learning_rate( iterations ):
-	schedule = [ 9, 18, 25, 33 ]
-	return [int(iterations * d) for d in schedule]
+	return [int(iterations * d) for d in EPOCH_SCHEDULE]
 
 def optimize_training_settings( epochs, batch_size, learning_rate, learning_rate_schedule, mega_batch_factor, print_rate, save_rate, resume_path, voice ):
 	name = f"{voice}-finetune"
@@ -611,12 +611,12 @@ def optimize_training_settings( epochs, batch_size, learning_rate, learning_rate
 	iterations = calc_iterations(epochs=epochs, lines=lines, batch_size=batch_size)
 	messages.append(f"For {epochs} epochs with {lines} lines, iterating for {iterations} steps")
 
-	if iterations < print_rate:
-		print_rate = iterations
+	if epochs < print_rate:
+		print_rate = epochs
 		messages.append(f"Print rate is too small for the given iteration step, clamping print rate to: {print_rate}")
 	
-	if iterations < save_rate:
-		save_rate = iterations
+	if epochs < save_rate:
+		save_rate = epochs
 		messages.append(f"Save rate is too small for the given iteration step, clamping save rate to: {save_rate}")
 
 	if resume_path and not os.path.exists(resume_path):
