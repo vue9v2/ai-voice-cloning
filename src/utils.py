@@ -898,19 +898,19 @@ def update_whisper_model(name):
 	print(f"Loading Whisper model: {args.whisper_model}")
 	whisper_model = whisper.load_model(args.whisper_model)
 
-def update_autoregressive_model(path_name):
-	args.autoregressive_model = path_name
+def update_autoregressive_model(autoregressive_model_path):
+	args.autoregressive_model = autoregressive_model_path
 	save_args_settings()
-	print(f'Stored autoregressive model to settings: {path_name}')
+	print(f'Stored autoregressive model to settings: {autoregressive_model_path}')
 
 	global tts
 	if not tts:
 		raise Exception("TTS is uninitialized or still initializing...")
 
-	print(f"Loading model: {path_name}")
+	print(f"Loading model: {autoregressive_model_path}")
 
-	if hasattr(tts, 'load_autoregressive_model') and tts.load_autoregressive_model(path_name):
-		tts.load_autoregressive_model(path_name)
+	if hasattr(tts, 'load_autoregressive_model') and tts.load_autoregressive_model(autoregressive_model_path):
+		tts.load_autoregressive_model(autoregressive_model_path)
 	# polyfill in case a user did NOT update the packages
 	# this shouldn't happen anymore, as I just clone mrq/tortoise-tts, and inject it into sys.path
 	else:
@@ -930,7 +930,7 @@ def update_autoregressive_model(path_name):
 
 	print(f"Loaded model: {tts.autoregressive_model_path}")
 	
-	return path_name
+	return autoregressive_model_path
 
 def update_args( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, defer_tts_load, device_override, sample_batch_size, concurrency_count, output_sample_rate, output_volume ):
 	global args
