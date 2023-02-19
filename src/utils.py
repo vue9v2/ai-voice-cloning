@@ -227,9 +227,8 @@ def generate(
 	}
 
 	if delimiter is None:
-		delimiter = ""
-
-	if delimiter == "\\n":
+		delimiter = "\n"
+	elif delimiter == "\\n":
 		delimiter = "\n"
 
 	if delimiter and delimiter != "" and delimiter in text:
