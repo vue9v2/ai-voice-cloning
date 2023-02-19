@@ -509,6 +509,7 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 
 
 def stop_training():
+	global training_process
 	if training_process is None:
 		return "No training in progress"
 	training_process.kill()
