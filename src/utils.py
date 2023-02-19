@@ -226,10 +226,13 @@ def generate(
 		'cvvp_amount': cvvp_weight,
 	}
 
+	if delimiter is None:
+		delimiter = ""
+
 	if delimiter == "\\n":
 		delimiter = "\n"
 
-	if delimiter != "" and delimiter in text:
+	if delimiter and delimiter != "" and delimiter in text:
 		texts = text.split(delimiter)
 	else:
 		texts = split_and_recombine_text(text)
@@ -353,7 +356,7 @@ def generate(
 
 	info = {
 		'text': text,
-		'delimiter': '\\n' if delimiter == "\n" else delimiter,
+		'delimiter': '\\n' if delimiter and delimiter == "\n" else delimiter,
 		'emotion': emotion,
 		'prompt': prompt,
 		'voice': voice,
