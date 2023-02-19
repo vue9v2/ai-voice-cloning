@@ -1,16 +1,8 @@
 git pull
+git submodule update
+
 python -m venv venv
 call .\venv\Scripts\activate.bat
-
-git clone https://git.ecker.tech/mrq/DL-Art-School dlas
-cd dlas
-git pull
-cd ..
-
-git clone https://git.ecker.tech/mrq/tortoise-tts
-cd tortoise-tts
-git pull
-cd ..
 
 python -m pip install --upgrade pip
 python -m pip install -r .\dlas\requirements.txt
