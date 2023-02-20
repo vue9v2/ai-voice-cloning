@@ -1051,6 +1051,8 @@ def unload_voicefixer():
 	do_gc()
 
 def load_whisper_model(name=None, progress=None):
+	global whisper_model
+	
 	if not name:
 		name = args.whisper_model
 	else:
