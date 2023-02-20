@@ -417,9 +417,16 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 
 	yield " ".join(cmd)
 	
+	info = {}
 	buffer = []
 	infos = []
 	yields = True
+	status = ""
+
+	it_rate = ""
+	it_time_start = 0
+	it_time_end = 0
+
 	for line in iter(training_process.stdout.readline, ""):
 		buffer.append(f'{line}')
 
@@ -430,13 +437,34 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 		elif progress is not None:
 			if line.find('  0%|') == 0:
 				open_state = True
+				it_time_start = time.time()
 			elif line.find('100%|') == 0 and open_state:
+				it_time_end = time.time()
 				open_state = False
 				it = it + 1
-				progress(it / float(its), f'[{it}/{its}] Training...')
-			elif line.find('INFO: [epoch:') >= 0:
-				infos.append(f'{line}')
-			elif line.find('Saving models and training states') >= 0:
+
+				it_time_delta = it_time_end-it_time_start
+				it_rate = f'[{"{:.3f}".format(it_time_delta)}s/it]' if it_time_delta >= 1 and it_time_delta != 0 else f'[{"{:.3f}".format(1/it_time_delta)}it/s]' # I doubt anyone will have it/s rates, but its here
+
+				progress(it / float(its), f'[{it}/{its}] {it_rate} Training... {status}')
+			
+			# try because I haven't tested this yet
+			try:
+				if line.find('INFO: [epoch:') >= 0:
+					# easily rip out our stats...
+					match = re.findall(r'\b([a-z_0-9]+?)\b: ([0-9]\.[0-9]+?e[+-]\d+)\b', line)
+					if match and len(match) > 0:
+						for k, v in match:
+							info[k] = float(v)
+					
+					# ...and returns our loss rate
+					# it would be nice for losses to be shown at every step
+					if 'loss_gpt_total' in info:
+						status = f"Total loss at step {int(info['step'])}: {info['loss_gpt_total']}"
+			except Exception as e:
+				pass
+
+			if line.find('Saving models and training states') >= 0:
 				checkpoint = checkpoint + 1
 				progress(checkpoint / float(checkpoints), f'[{checkpoint}/{checkpoints}] Saving checkpoint...')
 
@@ -459,7 +487,6 @@ def stop_training():
 	if training_process is None:
 		return "No training in progress"
 	training_process.kill()
-	training_process = None
 	return "Training cancelled"
 
 def prepare_dataset( files, outdir, language=None, progress=None ):
