@@ -16,6 +16,7 @@ import re
 import urllib.request
 import signal
 import gc
+import subprocess
 
 import tqdm
 import torch
@@ -40,91 +41,7 @@ tts = None
 webui = None
 voicefixer = None
 whisper_model = None
-
-def do_gc():
-	gc.collect()
-
-def get_args():
-	global args
-	return args
-
-def setup_args():
-	global args
-
-	default_arguments = {
-		'share': False,
-		'listen': None,
-		'check-for-updates': False,
-		'models-from-local-only': False,
-		'low-vram': False,
-		'sample-batch-size': None,
-		'embed-output-metadata': True,
-		'latents-lean-and-mean': True,
-		'voice-fixer': False, # getting tired of long initialization times in a Colab for downloading a large dataset for it
-		'voice-fixer-use-cuda': True,
-		'force-cpu-for-conditioning-latents': False,
-		'defer-tts-load': False,
-		'device-override': None,
-		'whisper-model': "base",
-		'autoregressive-model': None,
-		'concurrency-count': 2,
-		'output-sample-rate': 44100,
-		'output-volume': 1,
-	}
-
-	if os.path.isfile('./config/exec.json'):
-		with open(f'./config/exec.json', 'r', encoding="utf-8") as f:
-			overrides = json.load(f)
-			for k in overrides:
-				default_arguments[k] = overrides[k]
-
-	parser = argparse.ArgumentParser()
-	parser.add_argument("--share", action='store_true', default=default_arguments['share'], help="Lets Gradio return a public URL to use anywhere")
-	parser.add_argument("--listen", default=default_arguments['listen'], help="Path for Gradio to listen on")
-	parser.add_argument("--check-for-updates", action='store_true', default=default_arguments['check-for-updates'], help="Checks for update on startup")
-	parser.add_argument("--models-from-local-only", action='store_true', default=default_arguments['models-from-local-only'], help="Only loads models from disk, does not check for updates for models")
-	parser.add_argument("--low-vram", action='store_true', default=default_arguments['low-vram'], help="Disables some optimizations that increases VRAM usage")
-	parser.add_argument("--no-embed-output-metadata", action='store_false', default=not default_arguments['embed-output-metadata'], help="Disables embedding output metadata into resulting WAV files for easily fetching its settings used with the web UI (data is stored in the lyrics metadata tag)")
-	parser.add_argument("--latents-lean-and-mean", action='store_true', default=default_arguments['latents-lean-and-mean'], help="Exports the bare essentials for latents.")
-	parser.add_argument("--voice-fixer", action='store_true', default=default_arguments['voice-fixer'], help="Uses python module 'voicefixer' to improve audio quality, if available.")
-	parser.add_argument("--voice-fixer-use-cuda", action='store_true', default=default_arguments['voice-fixer-use-cuda'], help="Hints to voicefixer to use CUDA, if available.")
-	parser.add_argument("--force-cpu-for-conditioning-latents", default=default_arguments['force-cpu-for-conditioning-latents'], action='store_true', help="Forces computing conditional latents to be done on the CPU (if you constantyl OOM on low chunk counts)")
-	parser.add_argument("--defer-tts-load", default=default_arguments['defer-tts-load'], action='store_true', help="Defers loading TTS model")
-	parser.add_argument("--device-override", default=default_arguments['device-override'], help="A device string to override pass through Torch")
-	parser.add_argument("--whisper-model", default=default_arguments['whisper-model'], help="Specifies which whisper model to use for transcription.")
-	parser.add_argument("--autoregressive-model", default=default_arguments['autoregressive-model'], help="Specifies which autoregressive model to use for sampling.")
-	parser.add_argument("--sample-batch-size", default=default_arguments['sample-batch-size'], type=int, help="Sets how many batches to use during the autoregressive samples pass")
-	parser.add_argument("--concurrency-count", type=int, default=default_arguments['concurrency-count'], help="How many Gradio events to process at once")
-	parser.add_argument("--output-sample-rate", type=int, default=default_arguments['output-sample-rate'], help="Sample rate to resample the output to (from 24KHz)")
-	parser.add_argument("--output-volume", type=float, default=default_arguments['output-volume'], help="Adjusts volume of output")
-	
-	parser.add_argument("--os", default="unix", help="Specifies which OS, easily")
-	args = parser.parse_args()
-
-	args.embed_output_metadata = not args.no_embed_output_metadata
-
-	set_device_name(args.device_override)
-
-	args.listen_host = None
-	args.listen_port = None
-	args.listen_path = None
-	if args.listen:
-		try:
-			match = re.findall(r"^(?:(.+?):(\d+))?(\/.+?)?$", args.listen)[0]
-
-			args.listen_host = match[0] if match[0] != "" else "127.0.0.1"
-			args.listen_port = match[1] if match[1] != "" else None
-			args.listen_path = match[2] if match[2] != "" else "/"
-		except Exception as e:
-			pass
-
-	if args.listen_port is not None:
-		args.listen_port = int(args.listen_port)
-	
-	return args
-
-def pad(num, zeroes):
-	return str(num).zfill(zeroes+1)
+training_process = None
 
 def generate(
 	text,
@@ -154,9 +71,13 @@ def generate(
 	global tts
 
 	if not tts:
+		# should check if it's loading or unloaded, and load it if it's unloaded
 		raise Exception("TTS is uninitialized or still initializing...")
 
 	do_gc()
+
+	unload_whisper()
+	unload_voicefixer()
 
 	if voice != "microphone":
 		voices = [voice]
@@ -244,7 +165,7 @@ def generate(
 	audio_cache = {}
 
 	resample = None
-	# not a ternary in the event for some reason I want to rely on librosa's upsampling interpolator rather than torchaudio's, for some reason
+
 	if tts.output_sample_rate != args.output_sample_rate:
 		resampler = torchaudio.transforms.Resample(
 			tts.output_sample_rate,
@@ -385,7 +306,10 @@ def generate(
 		with open(f'{outdir}/{voice}_{name}.json', 'w', encoding="utf-8") as f:
 			f.write(json.dumps(info, indent='\t') )
 
-	if args.voice_fixer and voicefixer is not None:
+	if args.voice_fixer:
+		if not voicefixer:
+			load_voicefixer()
+
 		fixed_output_voices = []
 		for path in progress.tqdm(output_voices, desc="Running voicefix..."):
 			fixed = path.replace(".wav", "_fixed.wav")
@@ -434,23 +358,43 @@ def generate(
 		stats,
 	)
 
-import subprocess
+def cancel_generate():
+	from tortoise.api import STOP_SIGNAL
+	STOP_SIGNAL = True
 
-training_process = None
+def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
+	global tts
+	global args
+
+	if not tts:
+		raise Exception("TTS is uninitialized or still initializing...")
+
+	unload_whisper()
+	unload_voicefixer()
+
+	voice_samples, conditioning_latents = load_voice(voice, load_latents=False)
+
+	if voice_samples is None:
+		return
+
+	conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, progress=progress, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents)
+
+	if len(conditioning_latents) == 4:
+		conditioning_latents = (conditioning_latents[0], conditioning_latents[1], conditioning_latents[2], None)
+			
+	torch.save(conditioning_latents, f'{get_voice_dir()}/{voice}/cond_latents.pth')
+
+	return voice
+
 def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress(track_tqdm=True)):
-	try:
-		print("Unloading TTS to save VRAM.")
-		global tts
-		del tts
-		tts = None
-		trytorch.cuda.empty_cache()
-	except Exception as e:
-		pass
-
 	global training_process
-	torch.multiprocessing.freeze_support()
 	
-	do_gc()
+	# I don't know if this is still necessary, as it was bitching at me for not doing this, despite it being in a separate process
+	torch.multiprocessing.freeze_support()
+
+	unload_tts()
+	unload_whisper()
+	unload_voicefixer()
 
 	cmd = ['train.bat', config_path] if os.name == "nt" else ['bash', './train.sh', config_path]
 	print("Spawning process: ", " ".join(cmd))
@@ -510,7 +454,6 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 
 	return "".join(buffer[-buffer_size:])
 
-
 def stop_training():
 	global training_process
 	if training_process is None:
@@ -519,66 +462,51 @@ def stop_training():
 	training_process = None
 	return "Training cancelled"
 
-def setup_voicefixer(restart=False):
-	global voicefixer
-	if restart:
-		del voicefixer
-		voicefixer = None
+def prepare_dataset( files, outdir, language=None, progress=None ):
+	unload_tts()
 
-	try:
-		print("Initializating voice-fixer")
-		from voicefixer import VoiceFixer
-		voicefixer = VoiceFixer()
-		print("initialized voice-fixer")
-	except Exception as e:
-		print(f"Error occurred while tring to initialize voicefixer: {e}")
+	global whisper_model
+	if whisper_model is None:
+		load_whisper_model()
 
-def setup_tortoise(restart=False):
-	global args
-	global tts
+	os.makedirs(outdir, exist_ok=True)
 
-	do_gc()
+	idx = 0
+	results = {}
+	transcription = []
 
-	if args.voice_fixer:
-		setup_voicefixer(restart=restart)
+	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
+		print(f"Transcribing file: {file}")
+		
+		result = whisper_model.transcribe(file, language=language if language else "English")
+		results[os.path.basename(file)] = result
 
-	if restart:
-		del tts
-		tts = None
+		print(f"Transcribed file: {file}, {len(result['segments'])} found.")
 
-	print(f"Initializating TorToiSe... (using model: {args.autoregressive_model})")
-	try:
-		tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=args.autoregressive_model)
-	except Exception as e:
-		tts = TextToSpeech(minor_optimizations=not args.low_vram)
-		load_autoregressive_model(args.autoregressive_model)
+		waveform, sampling_rate = torchaudio.load(file)
+		num_channels, num_frames = waveform.shape
 
-	get_model_path('dvae.pth')
-	print("TorToiSe initialized, ready for generation.")
-	return tts
+		for segment in result['segments']: # enumerate_progress(result['segments'], desc="Segmenting voice file", progress=progress):
+			start = int(segment['start'] * sampling_rate)
+			end = int(segment['end'] * sampling_rate)
 
-def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
-	global tts
-	global args
+			sliced_waveform = waveform[:, start:end]
+			sliced_name = f"{pad(idx, 4)}.wav"
 
-	if not tts:
-		raise Exception("TTS is uninitialized or still initializing...")
+			torchaudio.save(f"{outdir}/{sliced_name}", sliced_waveform, sampling_rate)
 
-	do_gc()
+			transcription.append(f"{sliced_name}|{segment['text'].strip()}")
+			idx = idx + 1
+	
+	with open(f'{outdir}/whisper.json', 'w', encoding="utf-8") as f:
+		f.write(json.dumps(results, indent='\t'))
+	
+	with open(f'{outdir}/train.txt', 'w', encoding="utf-8") as f:
+		f.write("\n".join(transcription))
 
-	voice_samples, conditioning_latents = load_voice(voice, load_latents=False)
+	unload_whisper()
 
-	if voice_samples is None:
-		return
-
-	conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, progress=progress, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents)
-
-	if len(conditioning_latents) == 4:
-		conditioning_latents = (conditioning_latents[0], conditioning_latents[1], conditioning_latents[2], None)
-			
-	torch.save(conditioning_latents, f'{get_voice_dir()}/{voice}/cond_latents.pth')
-
-	return voice
+	return f"Processed dataset to: {outdir}"
 
 def calc_iterations( epochs, lines, batch_size ):
 	iterations = int(epochs * lines / float(batch_size))
@@ -679,54 +607,6 @@ def save_training_settings( iterations=None, batch_size=None, learning_rate=None
 
 	return f"Training settings saved to: {outfile}"
 
-def prepare_dataset( files, outdir, language=None, progress=None ):
-	global whisper_model
-	if whisper_model is None:
-		notify_progress(f"Loading Whisper model: {args.whisper_model}", progress)
-		whisper_model = whisper.load_model(args.whisper_model)
-
-	os.makedirs(outdir, exist_ok=True)
-
-	idx = 0
-	results = {}
-	transcription = []
-
-	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
-		print(f"Transcribing file: {file}")
-		
-		result = whisper_model.transcribe(file, language=language if language else "English")
-		results[os.path.basename(file)] = result
-
-		print(f"Transcribed file: {file}, {len(result['segments'])} found.")
-
-		waveform, sampling_rate = torchaudio.load(file)
-		num_channels, num_frames = waveform.shape
-
-		for segment in result['segments']: # enumerate_progress(result['segments'], desc="Segmenting voice file", progress=progress):
-			start = int(segment['start'] * sampling_rate)
-			end = int(segment['end'] * sampling_rate)
-
-			sliced_waveform = waveform[:, start:end]
-			sliced_name = f"{pad(idx, 4)}.wav"
-
-			torchaudio.save(f"{outdir}/{sliced_name}", sliced_waveform, sampling_rate)
-
-			transcription.append(f"{sliced_name}|{segment['text'].strip()}")
-			idx = idx + 1
-	
-	with open(f'{outdir}/whisper.json', 'w', encoding="utf-8") as f:
-		f.write(json.dumps(results, indent='\t'))
-	
-	with open(f'{outdir}/train.txt', 'w', encoding="utf-8") as f:
-		f.write("\n".join(transcription))
-
-	return f"Processed dataset to: {outdir}"
-
-def reset_generation_settings():
-	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
-		f.write(json.dumps({}, indent='\t') )
-	return import_generate_settings()
-
 def import_voices(files, saveAs=None, progress=None):
 	global args
 
@@ -760,7 +640,10 @@ def import_voices(files, saveAs=None, progress=None):
 
 			waveform, sampling_rate = torchaudio.load(filename)
 
-			if args.voice_fixer and voicefixer is not None:
+			if args.voice_fixer:
+				if not voicefixer:
+					load_voicefixer()
+
 				# resample to best bandwidth since voicefixer will do it anyways through librosa
 				if sampling_rate != 44100:
 					print(f"Resampling imported voice sample: {path}")
@@ -789,35 +672,29 @@ def import_voices(files, saveAs=None, progress=None):
 
 			print(f"Imported voice to {path}")
 
-def import_generate_settings(file="./config/generate.json"):
-	settings, _ = read_generate_settings(file, read_latents=False)
-	
-	if settings is None:
-		return None
+def get_voice_list(dir=get_voice_dir()):
+	os.makedirs(dir, exist_ok=True)
+	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ]) + ["microphone", "random"]
 
-	return (
-		None if 'text' not in settings else settings['text'],
-		None if 'delimiter' not in settings else settings['delimiter'],
-		None if 'emotion' not in settings else settings['emotion'],
-		None if 'prompt' not in settings else settings['prompt'],
-		None if 'voice' not in settings else settings['voice'],
-		None,
-		None,
-		None if 'seed' not in settings else settings['seed'],
-		None if 'candidates' not in settings else settings['candidates'],
-		None if 'num_autoregressive_samples' not in settings else settings['num_autoregressive_samples'],
-		None if 'diffusion_iterations' not in settings else settings['diffusion_iterations'],
-		0.8 if 'temperature' not in settings else settings['temperature'],
-		"DDIM" if 'diffusion_sampler' not in settings else settings['diffusion_sampler'],
-		8   if 'breathing_room' not in settings else settings['breathing_room'],
-		0.0 if 'cvvp_weight' not in settings else settings['cvvp_weight'],
-		0.8 if 'top_p' not in settings else settings['top_p'],
-		1.0 if 'diffusion_temperature' not in settings else settings['diffusion_temperature'],
-		1.0 if 'length_penalty' not in settings else settings['length_penalty'],
-		2.0 if 'repetition_penalty' not in settings else settings['repetition_penalty'],
-		2.0 if 'cond_free_k' not in settings else settings['cond_free_k'],
-		None if 'experimentals' not in settings else settings['experimentals'],
-	)
+def get_autoregressive_models(dir="./models/finetunes/"):
+	os.makedirs(dir, exist_ok=True)
+	return [get_model_path('autoregressive.pth')] + sorted([f'{dir}/{d}' for d in os.listdir(dir) if d[-4:] == ".pth" ])
+
+def get_dataset_list(dir="./training/"):
+	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.txt" in os.listdir(os.path.join(dir, d)) ])
+
+def get_training_list(dir="./training/"):
+	return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
+
+def do_gc():
+	gc.collect()
+	try:
+		trytorch.cuda.empty_cache()
+	except Exception as e:
+		pass
+
+def pad(num, zeroes):
+	return str(num).zfill(zeroes+1)
 
 def curl(url):
 	try:
@@ -866,71 +743,102 @@ def check_for_updates():
 
 	return False
 
-def reload_tts():
-	setup_tortoise(restart=True)
+def enumerate_progress(iterable, desc=None, progress=None, verbose=None):
+	if verbose and desc is not None:
+		print(desc)
 
-def cancel_generate():
-	from tortoise.api import STOP_SIGNAL
-	STOP_SIGNAL = True
+	if progress is None:
+		return tqdm(iterable, disable=not verbose)
+	return progress.tqdm(iterable, desc=f'{progress.msg_prefix} {desc}' if hasattr(progress, 'msg_prefix') else desc, track_tqdm=True)
 
-def get_voice_list(dir=get_voice_dir()):
-	os.makedirs(dir, exist_ok=True)
-	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ]) + ["microphone", "random"]
+def notify_progress(message, progress=None, verbose=True):
+	if verbose:
+		print(message)
 
-def get_autoregressive_models(dir="./models/finetunes/"):
-	os.makedirs(dir, exist_ok=True)
-	return [get_model_path('autoregressive.pth')] + sorted([f'{dir}/{d}' for d in os.listdir(dir) if d[-4:] == ".pth" ])
+	if progress is None:
+		return
 
-def get_dataset_list(dir="./training/"):
-	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.txt" in os.listdir(os.path.join(dir, d)) ])
+	progress(0, desc=message)
 
-def get_training_list(dir="./training/"):
-	return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
+def get_args():
+	global args
+	return args
 
-def update_whisper_model(name):
-	global whisper_model
-	if whisper_model:
-		del whisper_model
-		whisper_model = None
+def setup_args():
+	global args
+
+	default_arguments = {
+		'share': False,
+		'listen': None,
+		'check-for-updates': False,
+		'models-from-local-only': False,
+		'low-vram': False,
+		'sample-batch-size': None,
+		'embed-output-metadata': True,
+		'latents-lean-and-mean': True,
+		'voice-fixer': False, # getting tired of long initialization times in a Colab for downloading a large dataset for it
+		'voice-fixer-use-cuda': True,
+		'force-cpu-for-conditioning-latents': False,
+		'defer-tts-load': False,
+		'device-override': None,
+		'whisper-model': "base",
+		'autoregressive-model': None,
+		'concurrency-count': 2,
+		'output-sample-rate': 44100,
+		'output-volume': 1,
+	}
+
+	if os.path.isfile('./config/exec.json'):
+		with open(f'./config/exec.json', 'r', encoding="utf-8") as f:
+			overrides = json.load(f)
+			for k in overrides:
+				default_arguments[k] = overrides[k]
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument("--share", action='store_true', default=default_arguments['share'], help="Lets Gradio return a public URL to use anywhere")
+	parser.add_argument("--listen", default=default_arguments['listen'], help="Path for Gradio to listen on")
+	parser.add_argument("--check-for-updates", action='store_true', default=default_arguments['check-for-updates'], help="Checks for update on startup")
+	parser.add_argument("--models-from-local-only", action='store_true', default=default_arguments['models-from-local-only'], help="Only loads models from disk, does not check for updates for models")
+	parser.add_argument("--low-vram", action='store_true', default=default_arguments['low-vram'], help="Disables some optimizations that increases VRAM usage")
+	parser.add_argument("--no-embed-output-metadata", action='store_false', default=not default_arguments['embed-output-metadata'], help="Disables embedding output metadata into resulting WAV files for easily fetching its settings used with the web UI (data is stored in the lyrics metadata tag)")
+	parser.add_argument("--latents-lean-and-mean", action='store_true', default=default_arguments['latents-lean-and-mean'], help="Exports the bare essentials for latents.")
+	parser.add_argument("--voice-fixer", action='store_true', default=default_arguments['voice-fixer'], help="Uses python module 'voicefixer' to improve audio quality, if available.")
+	parser.add_argument("--voice-fixer-use-cuda", action='store_true', default=default_arguments['voice-fixer-use-cuda'], help="Hints to voicefixer to use CUDA, if available.")
+	parser.add_argument("--force-cpu-for-conditioning-latents", default=default_arguments['force-cpu-for-conditioning-latents'], action='store_true', help="Forces computing conditional latents to be done on the CPU (if you constantyl OOM on low chunk counts)")
+	parser.add_argument("--defer-tts-load", default=default_arguments['defer-tts-load'], action='store_true', help="Defers loading TTS model")
+	parser.add_argument("--device-override", default=default_arguments['device-override'], help="A device string to override pass through Torch")
+	parser.add_argument("--whisper-model", default=default_arguments['whisper-model'], help="Specifies which whisper model to use for transcription.")
+	parser.add_argument("--autoregressive-model", default=default_arguments['autoregressive-model'], help="Specifies which autoregressive model to use for sampling.")
+	parser.add_argument("--sample-batch-size", default=default_arguments['sample-batch-size'], type=int, help="Sets how many batches to use during the autoregressive samples pass")
+	parser.add_argument("--concurrency-count", type=int, default=default_arguments['concurrency-count'], help="How many Gradio events to process at once")
+	parser.add_argument("--output-sample-rate", type=int, default=default_arguments['output-sample-rate'], help="Sample rate to resample the output to (from 24KHz)")
+	parser.add_argument("--output-volume", type=float, default=default_arguments['output-volume'], help="Adjusts volume of output")
 	
-	args.whisper_model = name
+	parser.add_argument("--os", default="unix", help="Specifies which OS, easily")
+	args = parser.parse_args()
 
-	print(f"Loading Whisper model: {args.whisper_model}")
-	whisper_model = whisper.load_model(args.whisper_model)
+	args.embed_output_metadata = not args.no_embed_output_metadata
 
-def update_autoregressive_model(autoregressive_model_path):
-	args.autoregressive_model = autoregressive_model_path
-	save_args_settings()
-	print(f'Stored autoregressive model to settings: {autoregressive_model_path}')
+	if not args.device_override:
+		set_device_name(args.device_override)
 
-	global tts
-	if not tts:
-		raise Exception("TTS is uninitialized or still initializing...")
+	args.listen_host = None
+	args.listen_port = None
+	args.listen_path = None
+	if args.listen:
+		try:
+			match = re.findall(r"^(?:(.+?):(\d+))?(\/.+?)?$", args.listen)[0]
 
-	print(f"Loading model: {autoregressive_model_path}")
+			args.listen_host = match[0] if match[0] != "" else "127.0.0.1"
+			args.listen_port = match[1] if match[1] != "" else None
+			args.listen_path = match[2] if match[2] != "" else "/"
+		except Exception as e:
+			pass
 
-	if hasattr(tts, 'load_autoregressive_model') and tts.load_autoregressive_model(autoregressive_model_path):
-		tts.load_autoregressive_model(autoregressive_model_path)
-	# polyfill in case a user did NOT update the packages
-	# this shouldn't happen anymore, as I just clone mrq/tortoise-tts, and inject it into sys.path
-	else:
-		from tortoise.models.autoregressive import UnifiedVoice
-
-		tts.autoregressive_model_path = autoregressive_model_path if autoregressive_model_path and os.path.exists(autoregressive_model_path) else get_model_path('autoregressive.pth', tts.models_dir)
-
-		del tts.autoregressive
-		tts.autoregressive = UnifiedVoice(max_mel_tokens=604, max_text_tokens=402, max_conditioning_inputs=2, layers=30,
-										  model_dim=1024,
-										  heads=16, number_text_tokens=255, start_text_token=255, checkpointing=False,
-										  train_solo_embeddings=False).cpu().eval()
-		tts.autoregressive.load_state_dict(torch.load(tts.autoregressive_model_path))
-		tts.autoregressive.post_init_gpt2_config(kv_cache=tts.use_kv_cache)
-		if tts.preloaded_tensors:
-			tts.autoregressive = tts.autoregressive.to(tts.device)
-
-	print(f"Loaded model: {tts.autoregressive_model_path}")
+	if args.listen_port is not None:
+		args.listen_port = int(args.listen_port)
 	
-	return autoregressive_model_path
+	return args
 
 def update_args( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, defer_tts_load, device_override, sample_batch_size, concurrency_count, output_sample_rate, output_volume ):
 	global args
@@ -980,6 +888,44 @@ def save_args_settings():
 	with open(f'./config/exec.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(settings, indent='\t') )
 
+
+
+def import_generate_settings(file="./config/generate.json"):
+	settings, _ = read_generate_settings(file, read_latents=False)
+	
+	if settings is None:
+		return None
+
+	return (
+		None if 'text' not in settings else settings['text'],
+		None if 'delimiter' not in settings else settings['delimiter'],
+		None if 'emotion' not in settings else settings['emotion'],
+		None if 'prompt' not in settings else settings['prompt'],
+		None if 'voice' not in settings else settings['voice'],
+		None,
+		None,
+		None if 'seed' not in settings else settings['seed'],
+		None if 'candidates' not in settings else settings['candidates'],
+		None if 'num_autoregressive_samples' not in settings else settings['num_autoregressive_samples'],
+		None if 'diffusion_iterations' not in settings else settings['diffusion_iterations'],
+		0.8 if 'temperature' not in settings else settings['temperature'],
+		"DDIM" if 'diffusion_sampler' not in settings else settings['diffusion_sampler'],
+		8   if 'breathing_room' not in settings else settings['breathing_room'],
+		0.0 if 'cvvp_weight' not in settings else settings['cvvp_weight'],
+		0.8 if 'top_p' not in settings else settings['top_p'],
+		1.0 if 'diffusion_temperature' not in settings else settings['diffusion_temperature'],
+		1.0 if 'length_penalty' not in settings else settings['length_penalty'],
+		2.0 if 'repetition_penalty' not in settings else settings['repetition_penalty'],
+		2.0 if 'cond_free_k' not in settings else settings['cond_free_k'],
+		None if 'experimentals' not in settings else settings['experimentals'],
+	)
+
+
+def reset_generation_settings():
+	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
+		f.write(json.dumps({}, indent='\t') )
+	return import_generate_settings()
+
 def read_generate_settings(file, read_latents=True, read_json=True):
 	j = None
 	latents = None
@@ -1013,19 +959,119 @@ def read_generate_settings(file, read_latents=True, read_json=True):
 		latents,
 	)
 
-def enumerate_progress(iterable, desc=None, progress=None, verbose=None):
-	if verbose and desc is not None:
-		print(desc)
+def load_tts(restart=False):
+	global args
+	global tts
 
-	if progress is None:
-		return tqdm(iterable, disable=not verbose)
-	return progress.tqdm(iterable, desc=f'{progress.msg_prefix} {desc}' if hasattr(progress, 'msg_prefix') else desc, track_tqdm=True)
+	if restart:
+		unload_tts()
 
-def notify_progress(message, progress=None, verbose=True):
-	if verbose:
-		print(message)
+	print(f"Loading TorToiSe... (using model: {args.autoregressive_model})")
+	try:
+		tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=args.autoregressive_model)
+	except Exception as e:
+		tts = TextToSpeech(minor_optimizations=not args.low_vram)
+		load_autoregressive_model(args.autoregressive_model)
 
-	if progress is None:
-		return
+	get_model_path('dvae.pth')
+	print("Loaded TorToiSe, ready for generation.")
+	return tts
 
-	progress(0, desc=message)
+setup_tortoise = load_tts
+
+def unload_tts():
+	global tts
+
+	if tts:
+		print("Unloading TTS")
+		del tts
+		tts = None
+	do_gc()
+
+def reload_tts():
+	setup_tortoise(restart=True)
+
+def update_autoregressive_model(autoregressive_model_path):
+	args.autoregressive_model = autoregressive_model_path
+	save_args_settings()
+	print(f'Stored autoregressive model to settings: {autoregressive_model_path}')
+
+	global tts
+	if not tts:
+		raise Exception("TTS is uninitialized or still initializing...")
+
+	print(f"Loading model: {autoregressive_model_path}")
+
+	if hasattr(tts, 'load_autoregressive_model') and tts.load_autoregressive_model(autoregressive_model_path):
+		tts.load_autoregressive_model(autoregressive_model_path)
+	# polyfill in case a user did NOT update the packages
+	# this shouldn't happen anymore, as I just clone mrq/tortoise-tts, and inject it into sys.path
+	else:
+		from tortoise.models.autoregressive import UnifiedVoice
+
+		tts.autoregressive_model_path = autoregressive_model_path if autoregressive_model_path and os.path.exists(autoregressive_model_path) else get_model_path('autoregressive.pth', tts.models_dir)
+
+		del tts.autoregressive
+		tts.autoregressive = UnifiedVoice(max_mel_tokens=604, max_text_tokens=402, max_conditioning_inputs=2, layers=30,
+										  model_dim=1024,
+										  heads=16, number_text_tokens=255, start_text_token=255, checkpointing=False,
+										  train_solo_embeddings=False).cpu().eval()
+		tts.autoregressive.load_state_dict(torch.load(tts.autoregressive_model_path))
+		tts.autoregressive.post_init_gpt2_config(kv_cache=tts.use_kv_cache)
+		if tts.preloaded_tensors:
+			tts.autoregressive = tts.autoregressive.to(tts.device)
+
+	print(f"Loaded model: {tts.autoregressive_model_path}")
+
+	do_gc()
+	
+	return autoregressive_model_path
+
+def load_voicefixer(restart=False):
+	global voicefixer
+
+	if restart:
+		unload_voicefixer()
+
+	try:
+		print("Loading Voicefixer")
+		from voicefixer import VoiceFixer
+		voicefixer = VoiceFixer()
+	except Exception as e:
+		print(f"Error occurred while tring to initialize voicefixer: {e}")
+
+def unload_voicefixer():
+	global voicefixer
+
+	if voicefixer:
+		print("Unloading Voicefixer")
+		del voicefixer
+		voicefixer = None
+
+	do_gc()
+
+def load_whisper_model(name=None, progress=None):
+	if not name:
+		name = args.whisper_model
+	else:
+		args.whisper_model = name
+
+	notify_progress(f"Loading Whisper model: {args.whisper_model}", progress)
+	whisper_model = whisper.load_model(args.whisper_model)
+
+def unload_whisper():
+	global whisper_model
+
+	if whisper_model:
+		print("Unloading Whisper")
+		del whisper_model
+		whisper_model = None
+
+	do_gc()
+
+def update_whisper_model(name, progress=None):
+	global whisper_model
+	if whisper_model:
+		unload_whisper()
+	
+	load_whisper_model(name)
