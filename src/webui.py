@@ -82,7 +82,6 @@ def run_generation(
 		outputs[0],
 		gr.update(value=sample, visible=sample is not None),
 		gr.update(choices=outputs, value=outputs[0], visible=len(outputs) > 1, interactive=True),
-		gr.update(visible=len(outputs) > 1),
 		gr.update(value=stats, visible=True),
 	)
 
@@ -170,6 +169,8 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 		
 		latents = f'{outdir}/cond_latents.pth'
 
+	print(j, latents)
+
 	return (
 		gr.update(value=j, visible=j is not None),
 		gr.update(visible=j is not None),
@@ -244,12 +245,6 @@ def update_voices():
 def history_copy_settings( voice, file ):
 	return import_generate_settings( f"./results/{voice}/{file}" )
 
-def update_model_settings( autoregressive_model, whisper_model ):
-	update_autoregressive_model(autoregressive_model)
-	update_whisper_model(whisper_model)
-
-	save_args_settings()
-
 def setup_gradio():
 	global args
 	global ui
@@ -318,19 +313,30 @@ def setup_gradio():
 					generation_results = gr.Dataframe(label="Results", headers=["Seed", "Time"], visible=False)
 					source_sample = gr.Audio(label="Source Sample", visible=False)
 					output_audio = gr.Audio(label="Output")
-					candidates_list = gr.Dropdown(label="Candidates", type="value", visible=False)
-					output_pick = gr.Button(value="Select Candidate", visible=False)
+					candidates_list = gr.Dropdown(label="Candidates", type="value", visible=False, choices=[""], value="")
+					# output_pick = gr.Button(value="Select Candidate", visible=False)
+
+					def change_candidate( val ):
+						if not val:
+							return
+						print(val)
+						return val
+
+					candidates_list.change(
+						fn=change_candidate,
+						inputs=candidates_list,
+						outputs=output_audio,
+					)
 		with gr.Tab("History"):
 			with gr.Row():
 				with gr.Column():
 					history_info = gr.Dataframe(label="Results", headers=list(history_headers.keys()))
 			with gr.Row():
 				with gr.Column():
-					history_voices = gr.Dropdown(choices=get_voice_list("./results/"), label="Voice", type="value")
-					history_view_results_button = gr.Button(value="View Files")
+					result_voices = get_voice_list("./results/")
+					history_voices = gr.Dropdown(choices=result_voices, label="Voice", type="value", value=result_voices[0])
 				with gr.Column():
-					history_results_list = gr.Dropdown(label="Results",type="value", interactive=True)
-					history_view_result_button = gr.Button(value="View File")
+					history_results_list = gr.Dropdown(label="Results",type="value", interactive=True, value="")
 				with gr.Column():
 					history_audio = gr.Audio()
 					history_copy_settings_button = gr.Button(value="Copy Settings")
@@ -407,10 +413,10 @@ def setup_gradio():
 						gr.Checkbox(label="Low VRAM", value=args.low_vram),
 						gr.Checkbox(label="Embed Output Metadata", value=args.embed_output_metadata),
 						gr.Checkbox(label="Slimmer Computed Latents", value=args.latents_lean_and_mean),
-						gr.Checkbox(label="Voice Fixer", value=args.voice_fixer),
+						gr.Checkbox(label="Use Voice Fixer on Generated Output", value=args.voice_fixer),
 						gr.Checkbox(label="Use CUDA for Voice Fixer", value=args.voice_fixer_use_cuda),
 						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
-						gr.Checkbox(label="Defer TTS Load", value=args.defer_tts_load),
+						gr.Checkbox(label="Do Not Load TTS On Startup", value=args.defer_tts_load),
 						gr.Textbox(label="Device Override", value=args.device_override),
 					]
 				with gr.Column():
@@ -421,12 +427,28 @@ def setup_gradio():
 						gr.Slider(label="Ouptut Volume", minimum=0, maximum=2, value=args.output_volume),
 					]
 					
-					autoregressive_model_dropdown = gr.Dropdown(get_autoregressive_models(), label="Autoregressive Model", value=args.autoregressive_model)
+					autoregressive_models = get_autoregressive_models()
+					autoregressive_model_dropdown = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
 					whisper_model_dropdown = gr.Dropdown(["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"], label="Whisper Model", value=args.whisper_model)
-					save_settings_button = gr.Button(value="Save Settings")
+
+
+					autoregressive_model_dropdown.change(
+						fn=update_autoregressive_model,
+						inputs=autoregressive_model_dropdown,
+						outputs=None
+					)
+					whisper_model_dropdown.change(
+						fn=update_whisper_model,
+						inputs=whisper_model_dropdown,
+						outputs=None
+					)
 
 					gr.Button(value="Check for Updates").click(check_for_updates)
-					gr.Button(value="(Re)Load TTS").click(reload_tts)
+					gr.Button(value="(Re)Load TTS").click(
+						reload_tts,
+						inputs=autoregressive_model_dropdown,
+						outputs=None
+					)
 
 				for i in exec_inputs:
 					i.change( fn=update_args, inputs=exec_inputs )
@@ -457,7 +479,7 @@ def setup_gradio():
 			experimental_checkboxes,
 		]
 
-		history_view_results_button.click(
+		history_voices.change(
 			fn=history_view_results,
 			inputs=history_voices,
 			outputs=[
@@ -465,7 +487,7 @@ def setup_gradio():
 				history_results_list,
 			]
 		)
-		history_view_result_button.click(
+		history_results_list.change(
 			fn=lambda voice, file: f"./results/{voice}/{file}",
 			inputs=[
 				history_voices,
@@ -531,20 +553,14 @@ def setup_gradio():
 			]
 		)
 
-		output_pick.click(
-			lambda x: x,
-			inputs=candidates_list,
-			outputs=output_audio,
-		)
-
 		submit.click(
-			lambda: (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)),
-			outputs=[source_sample, candidates_list, output_pick, generation_results],
+			lambda: (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)),
+			outputs=[source_sample, candidates_list, generation_results],
 		)
 
 		submit_event = submit.click(run_generation,
 			inputs=input_settings,
-			outputs=[output_audio, source_sample, candidates_list, output_pick, generation_results],
+			outputs=[output_audio, source_sample, candidates_list, generation_results],
 		)
 
 
@@ -601,14 +617,6 @@ def setup_gradio():
 		save_yaml_button.click(save_training_settings_proxy,
 			inputs=training_settings,
 			outputs=save_yaml_output #console_output
-		)
-
-		save_settings_button.click(update_model_settings,
-			inputs=[
-				autoregressive_model_dropdown,
-				whisper_model_dropdown,
-			],
-			outputs=None
 		)
 
 		if os.path.isfile('./config/generate.json'):

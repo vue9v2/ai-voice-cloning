@@ -38,10 +38,12 @@ MODELS['dvae.pth'] = "https://huggingface.co/jbetker/tortoise-tts-v2/resolve/370
 
 args = None
 tts = None
+tts_loading = False
 webui = None
 voicefixer = None
 whisper_model = None
 training_process = None
+
 
 def generate(
 	text,
@@ -70,14 +72,16 @@ def generate(
 	global args
 	global tts
 
-	if not tts:
-		# should check if it's loading or unloaded, and load it if it's unloaded
-		raise Exception("TTS is uninitialized or still initializing...")
-
-	do_gc()
-
 	unload_whisper()
 	unload_voicefixer()
+
+	if not tts:
+		# should check if it's loading or unloaded, and load it if it's unloaded
+		if tts_loading:
+			raise Exception("TTS is still initializing...")
+		load_tts()
+
+	do_gc()
 
 	if voice != "microphone":
 		voices = [voice]
@@ -365,12 +369,14 @@ def cancel_generate():
 def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
 	global tts
 	global args
-
-	if not tts:
-		raise Exception("TTS is uninitialized or still initializing...")
-
+	
 	unload_whisper()
 	unload_voicefixer()
+
+	if not tts:
+		if tts_loading:
+			raise Exception("TTS is still initializing...")
+		load_tts()
 
 	voice_samples, conditioning_latents = load_voice(voice, load_latents=False)
 
@@ -953,9 +959,12 @@ def reset_generation_settings():
 		f.write(json.dumps({}, indent='\t') )
 	return import_generate_settings()
 
-def read_generate_settings(file, read_latents=True, read_json=True):
+def read_generate_settings(file, read_latents=True):
 	j = None
 	latents = None
+
+	if isinstance(file, list) and len(file) == 1:
+		file = file[0]
 
 	if file is not None:
 		if hasattr(file, 'name'):
@@ -981,24 +990,33 @@ def read_generate_settings(file, read_latents=True, read_json=True):
 		if "time" in j:
 			j["time"] = "{:.3f}".format(j["time"])
 
+
+
 	return (
 		j,
 		latents,
 	)
 
-def load_tts(restart=False):
+def load_tts( restart=False, model=None ):
 	global args
 	global tts
 
 	if restart:
 		unload_tts()
 
+
+	if model:
+		args.autoregressive_model = model
+
 	print(f"Loading TorToiSe... (using model: {args.autoregressive_model})")
+
+	tts_loading = True
 	try:
 		tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=args.autoregressive_model)
 	except Exception as e:
 		tts = TextToSpeech(minor_optimizations=not args.low_vram)
 		load_autoregressive_model(args.autoregressive_model)
+	tts_loading = False
 
 	get_model_path('dvae.pth')
 	print("Loaded TorToiSe, ready for generation.")
@@ -1015,17 +1033,24 @@ def unload_tts():
 		tts = None
 	do_gc()
 
-def reload_tts():
-	setup_tortoise(restart=True)
+def reload_tts( model=None ):
+	load_tts( restart=True, model=model )
 
 def update_autoregressive_model(autoregressive_model_path):
+	if not autoregressive_model_path or not os.path.exists(autoregressive_model_path):
+		return
+
 	args.autoregressive_model = autoregressive_model_path
 	save_args_settings()
 	print(f'Stored autoregressive model to settings: {autoregressive_model_path}')
 
 	global tts
 	if not tts:
-		raise Exception("TTS is uninitialized or still initializing...")
+		if tts_loading:
+			raise Exception("TTS is still initializing...")
+
+		load_tts( model=autoregressive_model_path )
+		return # redundant to proceed onward
 
 	print(f"Loading model: {autoregressive_model_path}")
 
@@ -1099,6 +1124,9 @@ def unload_whisper():
 	do_gc()
 
 def update_whisper_model(name, progress=None):
+	if not name:
+		return
+
 	global whisper_model
 	if whisper_model:
 		unload_whisper()
