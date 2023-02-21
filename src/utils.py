@@ -490,6 +490,17 @@ def stop_training():
 	training_process.kill()
 	return "Training cancelled"
 
+def convert_to_halfp():
+	autoregressive_model_path = get_model_path('autoregressive.pth')
+	model = torch.load(autoregressive_model_path)
+	for k in model:
+		if re.findall(r'\.weight$', k):
+			print(f"Converting: {k}")
+			model[k] = model[k].half()
+
+	torch.save(model, './models/tortoise/autoregressive_half.pth')
+	print('Converted model to half precision: ./models/tortoise/autoregressive_half.pth')
+
 def prepare_dataset( files, outdir, language=None, progress=None ):
 	unload_tts()
 
@@ -961,17 +972,20 @@ def read_generate_settings(file, read_latents=True):
 	if isinstance(file, list) and len(file) == 1:
 		file = file[0]
 
-	if file is not None:
-		if hasattr(file, 'name'):
-			file = file.name
+	try:
+		if file is not None:
+			if hasattr(file, 'name'):
+				file = file.name
 
-		if file[-4:] == ".wav":
-			metadata = music_tag.load_file(file)
-			if 'lyrics' in metadata:
-				j = json.loads(str(metadata['lyrics']))
-		elif file[-5:] == ".json":
-			with open(file, 'r') as f:
-				j = json.load(f)
+			if file[-4:] == ".wav":
+					metadata = music_tag.load_file(file)
+					if 'lyrics' in metadata:
+						j = json.loads(str(metadata['lyrics']))
+			elif file[-5:] == ".json":
+				with open(file, 'r') as f:
+					j = json.load(f)
+	except Exception as e:
+		pass
 
 	if j is None:
 		print("No metadata found in audio file to read")
