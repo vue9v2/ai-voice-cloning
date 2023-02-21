@@ -288,7 +288,7 @@ def setup_gradio():
 					seed = gr.Number(value=0, precision=0, label="Seed")
 
 					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value" )
-					num_autoregressive_samples = gr.Slider(value=128, minimum=0, maximum=512, step=1, label="Samples")
+					num_autoregressive_samples = gr.Slider(value=128, minimum=2, maximum=512, step=1, label="Samples")
 					diffusion_iterations = gr.Slider(value=128, minimum=0, maximum=512, step=1, label="Iterations")
 
 					temperature = gr.Slider(value=0.2, minimum=0, maximum=1, step=0.1, label="Temperature")
