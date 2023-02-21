@@ -195,7 +195,7 @@ def optimize_training_settings_proxy( *args, **kwargs ):
 		"\n".join(tup[7])
 	)
 
-def save_training_settings_proxy( epochs, batch_size, learning_rate, learning_rate_schedule, mega_batch_factor, print_rate, save_rate, resume_path, voice ):
+def save_training_settings_proxy( epochs, batch_size, learning_rate, learning_rate_schedule, mega_batch_factor, print_rate, save_rate, resume_path, half_p, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -232,6 +232,7 @@ def save_training_settings_proxy( epochs, batch_size, learning_rate, learning_ra
 		validation_path=validation_path,
 		output_name=f"{voice}/train.yaml",
 		resume_path=resume_path,
+		half_p=half_p,
 	))
 	return "\n".join(messages)
 
@@ -373,19 +374,11 @@ def setup_gradio():
 							gr.Number(label="Print Frequency per Epoch", value=5, precision=0),
 							gr.Number(label="Save Frequency per Epoch", value=5, precision=0),
 							gr.Textbox(label="Resume State Path", placeholder="./training/${voice}-finetune/training_state/${last_state}.state"),
+							gr.Checkbox(label="Half Precision", value=False),
 						]
 						dataset_list = gr.Dropdown( get_dataset_list(), label="Dataset", type="value" )
 						training_settings = training_settings + [ dataset_list ]
 						refresh_dataset_list = gr.Button(value="Refresh Dataset List")
-						"""
-						training_settings = training_settings + [
-							gr.Textbox(label="Training Name", placeholder="finetune"),
-							gr.Textbox(label="Dataset Name", placeholder="finetune"),
-							gr.Textbox(label="Dataset Path", placeholder="./training/finetune/train.txt"),
-							gr.Textbox(label="Validation Name", placeholder="finetune"),
-							gr.Textbox(label="Validation Path", placeholder="./training/finetune/train.txt"),
-						]
-						"""
 					with gr.Column():
 						save_yaml_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						optimize_yaml_button = gr.Button(value="Validate Training Configuration")

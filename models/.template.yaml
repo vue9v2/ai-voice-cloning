@@ -4,7 +4,7 @@ scale: 1
 gpu_ids: [0] # <-- unless you have multiple gpus, use this
 start_step: -1
 checkpointing_enabled: true  # <-- Gradient checkpointing. Enable for huge GPU memory savings. Disable for distributed training.
-fp16: false # might want to check this out
+fp16: ${float16} # might want to check this out
 wandb: false  # <-- enable to log to wandb. tensorboard logging is always enabled.
 use_tb_logger: true
 
@@ -26,10 +26,10 @@ datasets:
     use_bpe_tokenizer: True
     tokenizer_vocab: ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
-  val:
+  val: # I really do not care about validation right now
     name: ${validation_name}
     n_workers: 1
-    batch_size: 32 # this could be higher probably
+    batch_size: 1 # this could be higher probably
     mode: paired_voice_audio
     path: ${validation_path}
     fetcher_mode: ['lj']
@@ -124,6 +124,8 @@ train: # CHANGEME: ALL OF THESE PARAMETERS SHOULD BE EXPERIMENTED WITH
   warmup_iter: -1
   mega_batch_factor: ${mega_batch_factor} # <-- Gradient accumulation factor. If you are running OOM, increase this to [2,4,8].
   val_freq: ${iterations}
+
+  ema_enabled: false # I really don't think EMA matters
 
   default_lr_scheme: MultiStepLR
   gen_lr_steps: ${gen_lr_steps} #[50000, 100000, 140000, 180000]

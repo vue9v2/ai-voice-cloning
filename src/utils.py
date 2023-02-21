@@ -490,16 +490,20 @@ def stop_training():
 	training_process.kill()
 	return "Training cancelled"
 
+def get_halfp_model():
+	autoregressive_model_path = get_model_path('autoregressive.pth')
+	return autoregressive_model_path.replace(".pth", "_half.pth")
+
 def convert_to_halfp():
 	autoregressive_model_path = get_model_path('autoregressive.pth')
+	print(f'Converting model to half precision: {autoregressive_model_path}')
 	model = torch.load(autoregressive_model_path)
 	for k in model:
-		if re.findall(r'\.weight$', k):
-			print(f"Converting: {k}")
-			model[k] = model[k].half()
+		model[k] = model[k].half()
 
-	torch.save(model, './models/tortoise/autoregressive_half.pth')
-	print('Converted model to half precision: ./models/tortoise/autoregressive_half.pth')
+	outfile = get_halfp_model()
+	torch.save(model, outfile)
+	print(f'Converted model to half precision: {outfile}')
 
 def prepare_dataset( files, outdir, language=None, progress=None ):
 	unload_tts()
@@ -555,7 +559,7 @@ EPOCH_SCHEDULE = [ 9, 18, 25, 33 ]
 def schedule_learning_rate( iterations ):
 	return [int(iterations * d) for d in EPOCH_SCHEDULE]
 
-def optimize_training_settings( epochs, batch_size, learning_rate, learning_rate_schedule, mega_batch_factor, print_rate, save_rate, resume_path, voice ):
+def optimize_training_settings( epochs, batch_size, learning_rate, learning_rate_schedule, mega_batch_factor, print_rate, save_rate, resume_path, half_p, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -594,6 +598,11 @@ def optimize_training_settings( epochs, batch_size, learning_rate, learning_rate
 		resume_path = None
 		messages.append("Resume path specified, but does not exist. Disabling...")
 
+	if half_p:
+		messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
+		if not os.path.exists(get_halfp_model()):
+			convert_to_halfp()
+
 	messages.append(f"For {epochs} epochs with {lines} lines in batches of {batch_size}, iterating for {iterations} steps ({int(iterations / epochs)} steps per epoch)")
 
 	return (
@@ -607,7 +616,7 @@ def optimize_training_settings( epochs, batch_size, learning_rate, learning_rate
 		messages
 	)
 
-def save_training_settings( iterations=None, batch_size=None, learning_rate=None, learning_rate_schedule=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None ):	
+def save_training_settings( iterations=None, batch_size=None, learning_rate=None, learning_rate_schedule=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None ):	
 	settings = {
 		"iterations": iterations if iterations else 500,
 		"batch_size": batch_size if batch_size else 64,
@@ -622,10 +631,20 @@ def save_training_settings( iterations=None, batch_size=None, learning_rate=None
 		"validation_name": validation_name if validation_name else "finetune",
 		"validation_path": validation_path if validation_path else "./training/finetune/train.txt",
 
-		'resume_state': f"resume_state: '{resume_path}'" if resume_path else f"# resume_state: './training/{name if name else 'finetune'}/training_state/#.state'",
-		'pretrain_model_gpt': "pretrain_model_gpt: './models/tortoise/autoregressive.pth'" if not resume_path else "# pretrain_model_gpt: './models/tortoise/autoregressive.pth'"
+		'resume_state': f"resume_state: '{resume_path}'",
+		'pretrain_model_gpt': f"pretrain_model_gpt: './models/tortoise/autoregressive{'_half' if half_p else ''}.pth'",
+
+		'float16': 'true' if half_p else 'false'
 	}
 
+	if resume_path:
+		settings['pretrain_model_gpt'] = f"# {settings['pretrain_model_gpt']}"
+	else:
+		settings['resume_state'] = f"# resume_state: './training/{name if name else 'finetune'}/training_state/#.state'"
+
+	if half_p:
+		if not os.path.exists(get_halfp_model()):
+			convert_to_halfp()
 
 	if not output_name:
 		output_name = f'{settings["name"]}.yaml'
