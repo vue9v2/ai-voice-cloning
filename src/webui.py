@@ -238,7 +238,7 @@ def save_training_settings_proxy( epochs, batch_size, learning_rate, learning_ra
 
 def update_voices():
 	return (
-		gr.Dropdown.update(choices=get_voice_list()),
+		gr.Dropdown.update(choices=get_voice_list(append_defaults=True)),
 		gr.Dropdown.update(choices=get_voice_list()),
 		gr.Dropdown.update(choices=get_voice_list("./results/")),
 	)
@@ -277,7 +277,8 @@ def setup_gradio():
 
 					emotion = gr.Radio( ["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom"], value="Custom", label="Emotion", type="value", interactive=True )
 					prompt = gr.Textbox(lines=1, label="Custom Emotion + Prompt (if selected)")
-					voice = gr.Dropdown(get_voice_list(), label="Voice", type="value")
+					voice_list = get_voice_list(append_defaults=True)
+					voice = gr.Dropdown(choices=voice_list, label="Voice", type="value", value=voice_list[0]) # it'd be very cash money if gradio was able to default to the first value in the list without this shit
 					mic_audio = gr.Audio( label="Microphone Source", source="microphone", type="filepath" )
 					refresh_voices = gr.Button(value="Refresh Voice List")
 					voice_latents_chunks = gr.Slider(label="Voice Chunks", minimum=1, maximum=64, value=1, step=1)
@@ -410,14 +411,15 @@ def setup_gradio():
 						gr.Checkbox(label="Use CUDA for Voice Fixer", value=args.voice_fixer_use_cuda),
 						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
 						gr.Checkbox(label="Do Not Load TTS On Startup", value=args.defer_tts_load),
+						gr.Checkbox(label="Delete Non-Final Output", value=args.prune_nonfinal_outputs),
 						gr.Textbox(label="Device Override", value=args.device_override),
 					]
 				with gr.Column():
 					exec_inputs = exec_inputs + [
 						gr.Number(label="Sample Batch Size", precision=0, value=args.sample_batch_size),
 						gr.Number(label="Concurrency Count", precision=0, value=args.concurrency_count),
-						gr.Number(label="Ouptut Sample Rate", precision=0, value=args.output_sample_rate),
-						gr.Slider(label="Ouptut Volume", minimum=0, maximum=2, value=args.output_volume),
+						gr.Number(label="Output Sample Rate", precision=0, value=args.output_sample_rate),
+						gr.Slider(label="Output Volume", minimum=0, maximum=2, value=args.output_volume),
 					]
 					
 					autoregressive_models = get_autoregressive_models()
