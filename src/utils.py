@@ -692,7 +692,7 @@ def save_training_settings( iterations=None, batch_size=None, learning_rate=None
 		settings['resume_state'] = f"# resume_state: './training/{name if name else 'finetune'}/training_state/#.state'"
 
 	if half_p:
-		if not os.path.exists(get_halfp_model()):
+		if not os.path.exists(get_halfp_model_path()):
 			convert_to_halfp()
 
 	if not output_name:
