@@ -336,7 +336,7 @@ def setup_gradio():
 			with gr.Row():
 				with gr.Column():
 					result_voices = get_voice_list("./results/")
-					history_voices = gr.Dropdown(choices=result_voices, label="Voice", type="value", value=result_voices[0] if len(results_voices) > 0 else "")
+					history_voices = gr.Dropdown(choices=result_voices, label="Voice", type="value", value=result_voices[0] if len(result_voices) > 0 else "")
 				with gr.Column():
 					history_results_list = gr.Dropdown(label="Results",type="value", interactive=True, value="")
 				with gr.Column():
