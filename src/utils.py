@@ -482,6 +482,10 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 		if not training_started:
 			if line.find('Start training from epoch') >= 0:
 				training_started = True
+				
+				match = re.findall(r'iter: ([\d,]+)', line)
+				if match and len(match) > 0:
+					it = int(match[0].replace(",", ""))
 		elif progress is not None:
 			if line.find('  0%|') == 0:
 				open_state = True
@@ -496,12 +500,7 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 
 				progress(it / float(its), f'[{it}/{its}] {it_rate} Training... {status}')
 
-			# it also says Start training from epoch, so it might be better to do that
-			if line.find('INFO: Resuming training from epoch:') >= 0:
-				match = re.findall(r'iter: ([\d,]+)', line)
-				if match and len(match) > 0:
-					it = int(match[0].replace(",", ""))
-			elif line.find('INFO: [epoch:') >= 0:
+			if line.find('INFO: [epoch:') >= 0:
 				# easily rip out our stats...
 				match = re.findall(r'\b([a-z_0-9]+?)\b: ([0-9]\.[0-9]+?e[+-]\d+)\b', line)
 				if match and len(match) > 0:
