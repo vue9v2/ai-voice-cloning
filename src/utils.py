@@ -649,7 +649,7 @@ def optimize_training_settings( epochs, batch_size, learning_rate, learning_rate
 
 	if half_p:
 		messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
-		if not os.path.exists(get_halfp_model()):
+		if not os.path.exists(get_halfp_model_path()):
 			convert_to_halfp()
 
 	messages.append(f"For {epochs} epochs with {lines} lines in batches of {batch_size}, iterating for {iterations} steps ({int(iterations / epochs)} steps per epoch)")
