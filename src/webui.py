@@ -283,6 +283,25 @@ def setup_gradio():
 					refresh_voices = gr.Button(value="Refresh Voice List")
 					voice_latents_chunks = gr.Slider(label="Voice Chunks", minimum=1, maximum=64, value=1, step=1)
 					recompute_voice_latents = gr.Button(value="(Re)Compute Voice Latents")
+
+					def update_baseline_for_latents_chunks( voice ):
+						path = f'{get_voice_dir()}/{voice}/'
+						if not os.path.isdir(path):
+							return 1
+
+						files = os.listdir(path)
+						count = 0
+						for file in files:
+							if file[-4:] == ".wav":
+								count += 1
+
+						return count if count > 0 else 1
+
+					voice.change(
+						fn=update_baseline_for_latents_chunks,
+						inputs=voice,
+						outputs=voice_latents_chunks
+					)
 				with gr.Column():
 					candidates = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates")
 					seed = gr.Number(value=0, precision=0, label="Seed")
