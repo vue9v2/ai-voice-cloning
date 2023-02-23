@@ -200,7 +200,65 @@ def optimize_training_settings_proxy( *args, **kwargs ):
 		"\n".join(tup[7])
 	)
 
-def save_training_settings_proxy( epochs, batch_size, learning_rate, learning_rate_schedule, mega_batch_factor, print_rate, save_rate, resume_path, half_p, voice ):
+def import_training_settings_proxy( epochs, learning_rate, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, voice ):
+	indir = f'./training/{voice}/'
+	outdir = f'./training/{voice}-finetune/'
+
+	in_config_path = f"{indir}/train.yaml"
+	out_configs = sorted([d[:-5] for d in os.listdir(outdir) if d[-5:] == ".yaml" ])
+	if len(out_configs) > 0:
+		out_config_path = f'{outdir}/{out_configs[-1]}.yaml'
+
+	config_path = out_config_path if out_config_path else in_config_path
+
+	messages = []
+	with open(config_path, 'r') as file:
+		config = yaml.safe_load(file)
+		messages.append(f"Importing from: {config_path}")
+
+	dataset_path = f"./training/{voice}/train.txt"
+	with open(dataset_path, 'r', encoding="utf-8") as f:
+		lines = len(f.readlines())
+		messages.append(f"Basing epoch size to {lines} lines")
+
+	batch_size = config['datasets']['train']['batch_size']
+	mega_batch_factor = config['train']['mega_batch_factor']
+	
+	iterations = config['train']['niter']
+	steps_per_iteration = int(lines / batch_size)
+	epochs = int(iterations / steps_per_iteration)
+
+
+	learning_rate = config['steps']['gpt_train']['optimizer_params']['lr']
+	learning_rate_schedule = [ int(x / steps_per_iteration) for x in config['train']['gen_lr_steps'] ]
+
+
+	print_rate = int(config['logger']['print_freq'] / steps_per_iteration)
+	save_rate = int(config['logger']['save_checkpoint_freq'] / steps_per_iteration)
+
+	statedir = f'{outdir}/training_state/' # NOOO STOP MIXING YOUR CASES
+	resumes = sorted([int(d[:-6]) for d in os.listdir(statedir) if d[-6:] == ".state" ])
+
+	if len(resumes) > 0:
+		resume_path = f'{statedir}/{resumes[-1]}.state'
+		messages.append(f"Latest resume found: {resume_path}")
+
+	messages = "\n".join(messages)
+
+	return (
+		epochs,
+		learning_rate,
+		learning_rate_schedule,
+		batch_size,
+		mega_batch_factor,
+		print_rate,
+		save_rate,
+		resume_path,
+		messages
+	)
+
+
+def save_training_settings_proxy( epochs, learning_rate, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -333,8 +391,9 @@ def setup_gradio():
 					repetition_penalty = gr.Slider(value=2.0, minimum=0, maximum=8, label="Repetition Penalty")
 					cond_free_k = gr.Slider(value=2.0, minimum=0, maximum=4, label="Conditioning-Free K")
 				with gr.Column():
-					submit = gr.Button(value="Generate")
-					stop = gr.Button(value="Stop")
+					with gr.Row():
+						submit = gr.Button(value="Generate")
+						stop = gr.Button(value="Stop")
 
 					generation_results = gr.Dataframe(label="Results", headers=["Seed", "Time"], visible=False)
 					source_sample = gr.Audio(label="Source Sample", visible=False)
@@ -392,30 +451,45 @@ def setup_gradio():
 					with gr.Column():
 						training_settings = [
 							gr.Number(label="Epochs", value=500, precision=0),
-							gr.Number(label="Batch Size", value=128, precision=0),
-							gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6),
-							gr.Textbox(label="Learning Rate Schedule", placeholder=str(EPOCH_SCHEDULE)),
-							gr.Number(label="Mega Batch Factor", value=4, precision=0),
-							gr.Number(label="Print Frequency per Epoch", value=5, precision=0),
-							gr.Number(label="Save Frequency per Epoch", value=5, precision=0),
+						]
+						with gr.Row():
+							training_settings = training_settings + [
+								gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6),
+								gr.Textbox(label="Learning Rate Schedule", placeholder=str(EPOCH_SCHEDULE)),
+							]
+						with gr.Row():
+							training_settings = training_settings + [
+								gr.Number(label="Batch Size", value=128, precision=0),
+								gr.Number(label="Mega Batch Factor", value=4, precision=0),
+							]
+						with gr.Row():
+							training_settings = training_settings + [
+								gr.Number(label="Print Frequency (in epochs)", value=5, precision=0),
+								gr.Number(label="Save Frequency (in epochs)", value=5, precision=0),
+							]
+						training_settings = training_settings + [
 							gr.Textbox(label="Resume State Path", placeholder="./training/${voice}-finetune/training_state/${last_state}.state"),
 							gr.Checkbox(label="Half Precision", value=False),
 						]
 						dataset_list = gr.Dropdown( get_dataset_list(), label="Dataset", type="value" )
 						training_settings = training_settings + [ dataset_list ]
-						refresh_dataset_list = gr.Button(value="Refresh Dataset List")
+						with gr.Row():
+							refresh_dataset_list = gr.Button(value="Refresh Dataset List")
+							import_dataset_button = gr.Button(value="Import Dataset")
 					with gr.Column():
 						save_yaml_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
-						optimize_yaml_button = gr.Button(value="Validate Training Configuration")
-						save_yaml_button = gr.Button(value="Save Training Configuration")
+						with gr.Row():
+							optimize_yaml_button = gr.Button(value="Validate Training Configuration")
+							save_yaml_button = gr.Button(value="Save Training Configuration")
 			with gr.Tab("Run Training"):
 				with gr.Row():
 					with gr.Column():
 						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_list())
 						refresh_configs = gr.Button(value="Refresh Configurations")
-						start_training_button = gr.Button(value="Train")
-						stop_training_button = gr.Button(value="Stop")
-						reconnect_training_button = gr.Button(value="Reconnect")
+						with gr.Row():
+							start_training_button = gr.Button(value="Train")
+							stop_training_button = gr.Button(value="Stop")
+							reconnect_training_button = gr.Button(value="Reconnect")
 					with gr.Column():
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output")
@@ -640,6 +714,10 @@ def setup_gradio():
 		optimize_yaml_button.click(optimize_training_settings_proxy,
 			inputs=training_settings,
 			outputs=training_settings[1:8] + [save_yaml_output] #console_output
+		)
+		import_dataset_button.click(import_training_settings_proxy,
+			inputs=training_settings,
+			outputs=training_settings[:8] + [save_yaml_output] #console_output
 		)
 		save_yaml_button.click(save_training_settings_proxy,
 			inputs=training_settings,
