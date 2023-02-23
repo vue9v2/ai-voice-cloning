@@ -1,6 +1,6 @@
 #!/bin/bash
 git submodule init
-git submodule update
+git submodule update --remote
 
 python3 -m venv venv
 source ./venv/bin/activate

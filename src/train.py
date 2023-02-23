@@ -2,8 +2,6 @@ import os
 import sys
 import argparse
 
-
-
 # this is some massive kludge that only works if it's called from a shell and not an import/PIP package
 # it's smart-yet-irritating module-model loader breaks when trying to load something specifically when not from a shell
 
@@ -18,16 +16,6 @@ sys.path.insert(0, './dlas/')
 
 # don't even really bother trying to get DLAS PIP'd
 # without kludge, it'll have to be accessible as `codes` and not `dlas`
-
-import torch_intermediary
-# could just move this auto-toggle into the MITM script
-try:
-    import bitsandbytes as bnb
-    torch_intermediary.OVERRIDE_ADAM = True
-    torch_intermediary.OVERRIDE_ADAMW = True
-except Exception as e:
-    torch_intermediary.OVERRIDE_ADAM = False
-    torch_intermediary.OVERRIDE_ADAMW = False
 
 import torch
 from codes import train as tr
@@ -64,6 +52,13 @@ def train(yaml, launcher='none'):
     trainer.do_training()
 
 if __name__ == "__main__":
+    try:
+        import torch_intermediary
+        if torch_intermediary.OVERRIDE_ADAM:
+            print("Using BitsAndBytes ADAMW optimizations")
+    except Exception as e:
+        pass
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, help='Path to option YAML file.', default='../options/train_vit_latent.yml', nargs='+') # ugh
     parser.add_argument('--launcher', choices=['none', 'pytorch'], default='none', help='job launcher')
