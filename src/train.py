@@ -52,6 +52,7 @@ def train(yaml, launcher='none'):
     trainer.do_training()
 
 if __name__ == "__main__":
+    # simple check because I'm brain damaged and forgot I can't modify what a module exports by simply changing the booleans that decide what it exports after the fact
     try:
         import torch_intermediary
         if torch_intermediary.OVERRIDE_ADAM:
