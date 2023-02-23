@@ -222,7 +222,7 @@ def generate(
 
 	for line, cut_text in enumerate(texts):
 		if emotion == "Custom":
-			if prompt.strip() != "":
+			if prompt and prompt.strip() != "":
 				cut_text = f"[{prompt},] {cut_text}"
 		else:
 			cut_text = f"[I am really {emotion.lower()},] {cut_text}"

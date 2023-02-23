@@ -45,6 +45,11 @@ def run_generation(
 	experimental_checkboxes,
 	progress=gr.Progress(track_tqdm=True)
 ):
+	if not text:
+		raise gr.Error("Please provide text.")
+	if not voice:
+		raise gr.Error("Please provide a voice.")
+
 	try:
 		sample, outputs, stats = generate(
 			text=text,
