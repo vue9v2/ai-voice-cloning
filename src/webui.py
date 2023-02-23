@@ -410,6 +410,7 @@ def setup_gradio():
 						refresh_configs = gr.Button(value="Refresh Configurations")
 						start_training_button = gr.Button(value="Train")
 						stop_training_button = gr.Button(value="Stop")
+						reconnect_training_button = gr.Button(value="Reconnect")
 					with gr.Column():
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output")
@@ -612,6 +613,13 @@ def setup_gradio():
 		)
 		stop_training_button.click(stop_training,
 			inputs=None,
+			outputs=training_output #console_output
+		)
+		reconnect_training_button.click(reconnect_training,
+			inputs=[
+				verbose_training,
+				training_buffer_size,
+			],
 			outputs=training_output #console_output
 		)
 		prepare_dataset_button.click(

@@ -2,7 +2,7 @@ name: ${name}
 model: extensibletrainer
 scale: 1
 gpu_ids: [0] # <-- unless you have multiple gpus, use this
-start_step: -1
+start_step: 0
 checkpointing_enabled: true  # <-- Gradient checkpointing. Enable for huge GPU memory savings. Disable for distributed training.
 fp16: ${float16} # might want to check this out
 wandb: false  # <-- enable to log to wandb. tensorboard logging is always enabled.

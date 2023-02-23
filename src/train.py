@@ -1,8 +1,8 @@
-import torch
-import argparse
-
 import os
 import sys
+import argparse
+
+
 
 # this is some massive kludge that only works if it's called from a shell and not an import/PIP package
 # it's smart-yet-irritating module-model loader breaks when trying to load something specifically when not from a shell
@@ -19,6 +19,17 @@ sys.path.insert(0, './dlas/')
 # don't even really bother trying to get DLAS PIP'd
 # without kludge, it'll have to be accessible as `codes` and not `dlas`
 
+import torch_intermediary
+# could just move this auto-toggle into the MITM script
+try:
+    import bitsandbytes as bnb
+    torch_intermediary.OVERRIDE_ADAM = True
+    torch_intermediary.OVERRIDE_ADAMW = True
+except Exception as e:
+    torch_intermediary.OVERRIDE_ADAM = False
+    torch_intermediary.OVERRIDE_ADAMW = False
+
+import torch
 from codes import train as tr
 from utils import util, options as option
 

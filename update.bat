@@ -1,5 +1,5 @@
 git pull
-git submodule update
+git submodule update --remote
 
 python -m venv venv
 call .\venv\Scripts\activate.bat
