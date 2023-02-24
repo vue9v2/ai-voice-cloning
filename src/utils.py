@@ -407,8 +407,8 @@ def generate(
 	)
 
 def cancel_generate():
-	from tortoise.api import STOP_SIGNAL
-	STOP_SIGNAL = True
+	import tortoise.api
+	tortoise.api.STOP_SIGNAL = True
 
 def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
 	global tts
@@ -557,9 +557,10 @@ def run_training(config_path, verbose=False, buffer_size=8, progress=gr.Progress
 		if res:
 			yield res
 
-	training_state.process.stdout.close()
-	return_code = training_state.process.wait()
-	training_state = None
+	if training_state:
+		training_state.process.stdout.close()
+		return_code = training_state.process.wait()
+		training_state = None
 	
 	#if return_code:
 	#	raise subprocess.CalledProcessError(return_code, cmd)
@@ -575,10 +576,15 @@ def reconnect_training(config_path, verbose=False, buffer_size=8, progress=gr.Pr
 			yield res
 
 def stop_training():
-	global training_process
-	if training_process is None:
+	global training_state
+	if training_state is None:
 		return "No training in progress"
-	training_process.kill()
+	print("Killing training process...")
+	training_state.killed = True
+	training_state.process.stdout.close()
+	training_state.process.kill()
+	return_code = training_state.process.wait()
+	training_state = None
 	return "Training cancelled"
 
 def get_halfp_model_path():
@@ -1234,6 +1240,7 @@ def load_voicefixer(restart=False):
 		print("Loading Voicefixer")
 		from voicefixer import VoiceFixer
 		voicefixer = VoiceFixer()
+		print("Loaded Voicefixer")
 	except Exception as e:
 		print(f"Error occurred while tring to initialize voicefixer: {e}")
 
@@ -1244,6 +1251,7 @@ def unload_voicefixer():
 		print("Unloading Voicefixer")
 		del voicefixer
 		voicefixer = None
+		print("Unloaded Voicefixer")
 
 	do_gc()
 
@@ -1254,9 +1262,11 @@ def load_whisper_model(name=None, progress=None):
 		name = args.whisper_model
 	else:
 		args.whisper_model = name
+		save_args_settings()
 
 	notify_progress(f"Loading Whisper model: {args.whisper_model}", progress)
 	whisper_model = whisper.load_model(args.whisper_model)
+	print("Loaded Whisper model")
 
 def unload_whisper():
 	global whisper_model
@@ -1265,6 +1275,7 @@ def unload_whisper():
 		print("Unloading Whisper")
 		del whisper_model
 		whisper_model = None
+		print("Unloaded Whisper")
 
 	do_gc()
 
@@ -1272,8 +1283,11 @@ def update_whisper_model(name, progress=None):
 	if not name:
 		return
 
+
 	global whisper_model
 	if whisper_model:
 		unload_whisper()
-	
-	load_whisper_model(name)
+		load_whisper_model(name)
+	else:
+		args.whisper_model = name
+		save_args_settings()

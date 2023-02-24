@@ -1,13 +1,13 @@
 import os
 
-from utils import *
-from webui import *
-
 if 'TORTOISE_MODELS_DIR' not in os.environ:
 	os.environ['TORTOISE_MODELS_DIR'] = os.path.realpath(os.path.join(os.getcwd(), './models/tortoise/'))
 
 if 'TRANSFORMERS_CACHE' not in os.environ:
 	os.environ['TRANSFORMERS_CACHE'] = os.path.realpath(os.path.join(os.getcwd(), './models/transformers/'))
+
+from utils import *
+from webui import *
 
 if __name__ == "__main__":
 	args = setup_args()

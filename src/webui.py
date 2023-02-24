@@ -78,7 +78,7 @@ def run_generation(
 	except Exception as e:
 		message = str(e)
 		if message == "Kill signal detected":
-			reload_tts()
+			unload_tts()
 
 		raise gr.Error(message)
 	
@@ -745,7 +745,7 @@ def setup_gradio():
 		if args.check_for_updates:
 			ui.load(check_for_updates)
 
-		stop.click(fn=cancel_generate, inputs=None, outputs=None, cancels=[submit_event])
+		stop.click(fn=cancel_generate, inputs=None, outputs=None)
 
 
 	ui.queue(concurrency_count=args.concurrency_count)

@@ -2,6 +2,19 @@ import os
 import sys
 import argparse
 
+
+"""
+if 'BITSANDBYTES_OVERRIDE_LINEAR' not in os.environ:
+    os.environ['BITSANDBYTES_OVERRIDE_LINEAR'] = '0'
+if 'BITSANDBYTES_OVERRIDE_EMBEDDING' not in os.environ:
+    os.environ['BITSANDBYTES_OVERRIDE_EMBEDDING'] = '1'
+if 'BITSANDBYTES_OVERRIDE_ADAM' not in os.environ:
+    os.environ['BITSANDBYTES_OVERRIDE_ADAM'] = '1'
+if 'BITSANDBYTES_OVERRIDE_ADAMW' not in os.environ:
+    os.environ['BITSANDBYTES_OVERRIDE_ADAMW'] = '1'
+"""
+
+
 # this is some massive kludge that only works if it's called from a shell and not an import/PIP package
 # it's smart-yet-irritating module-model loader breaks when trying to load something specifically when not from a shell
 

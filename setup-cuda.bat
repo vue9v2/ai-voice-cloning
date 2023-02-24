@@ -10,7 +10,9 @@ python -m pip install -r .\tortoise-tts\requirements.txt
 python -m pip install -r .\requirements.txt
 python -m pip install -e .\tortoise-tts\
 
-copy .\dlas\bitsandbytes_windows\* .\venv\Lib\site-packages\bitsandbytes\. /Y
+xcopy .\dlas\bitsandbytes_windows\* .\venv\Lib\site-packages\bitsandbytes\. /Y
+xcopy .\dlas\bitsandbytes_windows\cuda_setup\* .\venv\Lib\site-packages\bitsandbytes\cuda_setup\. /Y
+xcopy .\dlas\bitsandbytes_windows\nn\* .\venv\Lib\site-packages\bitsandbytes\nn\. /Y
 
 deactivate
 pause
