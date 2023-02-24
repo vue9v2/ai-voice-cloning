@@ -843,10 +843,10 @@ def get_autoregressive_models(dir="./models/finetunes/"):
 	for training in os.listdir(f'./training/'):
 		if not os.path.isdir(f'./training/{training}/') or not os.path.isdir(f'./training/{training}/models/'):
 			continue
-		#found = found + sorted([ f'./training/{training}/model/{d}' for d in os.listdir(f'./training/{training}/models/') if d[-8:] == "_gpt.pth" ])
+		#found = found + sorted([ f'./training/{training}/models/{d}' for d in os.listdir(f'./training/{training}/models/') if d[-8:] == "_gpt.pth" ])
 		models = sorted([ int(d[:-8]) for d in os.listdir(f'./training/{training}/models/') if d[-8:] == "_gpt.pth" ])
-		found = found + [ f'./training/{training}/model/{d}_gpt.pth' for d in models ]
-		#found.append(f'./training/{training}/model/{models[-1]}_gpt.pth')
+		found = found + [ f'./training/{training}/models/{d}_gpt.pth' for d in models ]
+		#found.append(f'./training/{training}/models/{models[-1]}_gpt.pth')
 
 	return base + additionals + found
 
@@ -1182,6 +1182,7 @@ def reload_tts( model=None ):
 
 def update_autoregressive_model(autoregressive_model_path):
 	if not autoregressive_model_path or not os.path.exists(autoregressive_model_path):
+		print(f"Invalid model: {autoregressive_model_path}")
 		return
 
 	args.autoregressive_model = autoregressive_model_path
