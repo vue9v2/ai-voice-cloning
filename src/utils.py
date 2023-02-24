@@ -838,7 +838,17 @@ def get_autoregressive_models(dir="./models/finetunes/"):
 	if os.path.exists(halfp):
 		base.append(halfp)
 
-	return base + sorted([f'{dir}/{d}' for d in os.listdir(dir) if d[-4:] == ".pth" ])
+	additionals = sorted([f'{dir}/{d}' for d in os.listdir(dir) if d[-4:] == ".pth" ])
+	found = []
+	for training in os.listdir(f'./training/'):
+		if not os.path.isdir(f'./training/{training}/') or not os.path.isdir(f'./training/{training}/models/'):
+			continue
+		#found = found + sorted([ f'./training/{training}/model/{d}' for d in os.listdir(f'./training/{training}/models/') if d[-8:] == "_gpt.pth" ])
+		models = sorted([ int(d[:-8]) for d in os.listdir(f'./training/{training}/models/') if d[-8:] == "_gpt.pth" ])
+		found = found + [ f'./training/{training}/model/{d}_gpt.pth' for d in models ]
+		#found.append(f'./training/{training}/model/{models[-1]}_gpt.pth')
+
+	return base + additionals + found
 
 def get_dataset_list(dir="./training/"):
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.txt" in os.listdir(os.path.join(dir, d)) ])
