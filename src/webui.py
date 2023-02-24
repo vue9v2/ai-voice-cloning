@@ -205,7 +205,8 @@ def import_training_settings_proxy( epochs, learning_rate, learning_rate_schedul
 	outdir = f'./training/{voice}-finetune/'
 
 	in_config_path = f"{indir}/train.yaml"
-	out_configs = sorted([d[:-5] for d in os.listdir(outdir) if d[-5:] == ".yaml" ])
+	if os.path.isdir(outdir):
+		out_configs = sorted([d[:-5] for d in os.listdir(outdir) if d[-5:] == ".yaml" ])
 	if len(out_configs) > 0:
 		out_config_path = f'{outdir}/{out_configs[-1]}.yaml'
 
