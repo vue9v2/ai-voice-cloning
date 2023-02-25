@@ -542,12 +542,12 @@ class TrainingState():
 			if line.find('%|') > 0 and not self.open_state:
 				if owner:
 					self.open_state = True
-			elif lapsed:
+			elif lapsed and self.open_state:
 				if owner:
 					self.open_state = False
 					self.epoch = self.epoch + 1
 					self.it = int(self.epoch * (self.dataset_size / self.batch_size))
-	 
+
 					self.epoch_time_end = time.time()
 					self.epoch_time_delta = self.epoch_time_end-self.epoch_time_start
 					self.epoch_time_start = time.time()
