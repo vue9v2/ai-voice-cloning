@@ -1,7 +1,7 @@
 import os
 import sys
 import argparse
-
+import yaml
 
 """
 if 'BITSANDBYTES_OVERRIDE_LINEAR' not in os.environ:
@@ -14,6 +14,21 @@ if 'BITSANDBYTES_OVERRIDE_ADAMW' not in os.environ:
     os.environ['BITSANDBYTES_OVERRIDE_ADAMW'] = '1'
 """
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-opt', type=str, help='Path to option YAML file.', default='../options/train_vit_latent.yml', nargs='+') # ugh
+    parser.add_argument('--launcher', choices=['none', 'pytorch'], default='none', help='job launcher')
+    args = parser.parse_args()
+    args.opt = " ".join(args.opt) # absolutely disgusting
+
+    with open(args.opt, 'r') as file:
+        opt_config = yaml.safe_load(file)
+
+    if "ext" in opt_config and "bitsandbytes" in opt_config["ext"] and not opt_config["ext"]["bitsandbytes"]:
+        os.environ['BITSANDBYTES_OVERRIDE_LINEAR'] = '0'
+        os.environ['BITSANDBYTES_OVERRIDE_EMBEDDING'] = '0'
+        os.environ['BITSANDBYTES_OVERRIDE_ADAM'] = '0'
+        os.environ['BITSANDBYTES_OVERRIDE_ADAMW'] = '0'
 
 # this is some massive kludge that only works if it's called from a shell and not an import/PIP package
 # it's smart-yet-irritating module-model loader breaks when trying to load something specifically when not from a shell
@@ -70,13 +85,9 @@ if __name__ == "__main__":
         import torch_intermediary
         if torch_intermediary.OVERRIDE_ADAM:
             print("Using BitsAndBytes ADAMW optimizations")
+        else:
+            print("NOT using BitsAndBytes ADAMW optimizations")
     except Exception as e:
         pass
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-opt', type=str, help='Path to option YAML file.', default='../options/train_vit_latent.yml', nargs='+') # ugh
-    parser.add_argument('--launcher', choices=['none', 'pytorch'], default='none', help='job launcher')
-    args = parser.parse_args()
-    args.opt = " ".join(args.opt) # absolutely disgusting
 
     train(args.opt, args.launcher)

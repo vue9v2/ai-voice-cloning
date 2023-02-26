@@ -200,11 +200,12 @@ def optimize_training_settings_proxy( *args, **kwargs ):
 		"\n".join(tup[7])
 	)
 
-def import_training_settings_proxy( epochs, learning_rate, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, voice ):
+def import_training_settings_proxy( voice ):
 	indir = f'./training/{voice}/'
 	outdir = f'./training/{voice}-finetune/'
 
 	in_config_path = f"{indir}/train.yaml"
+	out_configs = []
 	if os.path.isdir(outdir):
 		out_configs = sorted([d[:-5] for d in os.listdir(outdir) if d[-5:] == ".yaml" ])
 	if len(out_configs) > 0:
@@ -244,6 +245,12 @@ def import_training_settings_proxy( epochs, learning_rate, learning_rate_schedul
 		resume_path = f'{statedir}/{resumes[-1]}.state'
 		messages.append(f"Latest resume found: {resume_path}")
 
+	half_p = config['fp16']
+	bnb = True
+
+	if "ext" in config and "bitsandbytes" in config["ext"]:
+		bnb = config["ext"]["bitsandbytes"]
+
 	messages = "\n".join(messages)
 
 	return (
@@ -255,11 +262,13 @@ def import_training_settings_proxy( epochs, learning_rate, learning_rate_schedul
 		print_rate,
 		save_rate,
 		resume_path,
+		half_p,
+		bnb,
 		messages
 	)
 
 
-def save_training_settings_proxy( epochs, learning_rate, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, voice ):
+def save_training_settings_proxy( epochs, learning_rate, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, bnb, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -297,6 +306,7 @@ def save_training_settings_proxy( epochs, learning_rate, learning_rate_schedule,
 		output_name=f"{voice}/train.yaml",
 		resume_path=resume_path,
 		half_p=half_p,
+		bnb=bnb,
 	))
 	return "\n".join(messages)
 
@@ -471,10 +481,12 @@ def setup_gradio():
 							]
 						training_settings = training_settings + [
 							gr.Textbox(label="Resume State Path", placeholder="./training/${voice}-finetune/training_state/${last_state}.state"),
-							gr.Checkbox(label="Half Precision", value=False),
 						]
+						training_halfp = gr.Checkbox(label="Half Precision", value=args.training_default_halfp)
+						training_bnb = gr.Checkbox(label="BitsAndBytes", value=args.training_default_bnb)
 						dataset_list = gr.Dropdown( get_dataset_list(), label="Dataset", type="value" )
-						training_settings = training_settings + [ dataset_list ]
+						training_settings = training_settings + [ training_halfp, training_bnb, dataset_list ]
+
 						with gr.Row():
 							refresh_dataset_list = gr.Button(value="Refresh Dataset List")
 							import_dataset_button = gr.Button(value="Import Dataset")
@@ -557,6 +569,8 @@ def setup_gradio():
 						inputs=whisper_model_dropdown,
 						outputs=None
 					)
+
+					exec_inputs = exec_inputs + [ training_halfp, training_bnb ]
 
 
 				for i in exec_inputs:
@@ -731,8 +745,8 @@ def setup_gradio():
 			outputs=training_settings[1:8] + [save_yaml_output] #console_output
 		)
 		import_dataset_button.click(import_training_settings_proxy,
-			inputs=training_settings,
-			outputs=training_settings[:8] + [save_yaml_output] #console_output
+			inputs=dataset_list,
+			outputs=training_settings[:10] + [save_yaml_output] #console_output
 		)
 		save_yaml_button.click(save_training_settings_proxy,
 			inputs=training_settings,

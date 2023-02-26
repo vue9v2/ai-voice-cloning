@@ -538,7 +538,7 @@ class TrainingState():
 					"""
 					# I wanted frequently updated ETA, but I can't wrap my noggin around getting it to work on an empty belly
 					# will fix later
-					
+
 					#self.eta = (self.its - self.it) * self.it_time_delta
 					self.it_time_deltas = self.it_time_deltas + self.it_time_delta
 					self.it_taken = self.it_taken + 1
@@ -731,7 +731,7 @@ EPOCH_SCHEDULE = [ 9, 18, 25, 33 ]
 def schedule_learning_rate( iterations ):
 	return [int(iterations * d) for d in EPOCH_SCHEDULE]
 
-def optimize_training_settings( epochs, learning_rate, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, voice ):
+def optimize_training_settings( epochs, learning_rate, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, bnb, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -777,6 +777,9 @@ def optimize_training_settings( epochs, learning_rate, learning_rate_schedule, b
 		messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
 		if not os.path.exists(get_halfp_model_path()):
 			convert_to_halfp()
+	
+	if bnb:
+		messages.append("BitsAndBytes requested. Please note this is ! EXPERIMENTAL !")
 
 	messages.append(f"For {epochs} epochs with {lines} lines in batches of {batch_size}, iterating for {iterations} steps ({int(iterations / epochs)} steps per epoch)")
 
@@ -791,7 +794,7 @@ def optimize_training_settings( epochs, learning_rate, learning_rate_schedule, b
 		messages
 	)
 
-def save_training_settings( iterations=None, learning_rate=None, learning_rate_schedule=None, batch_size=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None ):	
+def save_training_settings( iterations=None, learning_rate=None, learning_rate_schedule=None, batch_size=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None, bnb=None ):
 	settings = {
 		"iterations": iterations if iterations else 500,
 		"batch_size": batch_size if batch_size else 64,
@@ -809,7 +812,8 @@ def save_training_settings( iterations=None, learning_rate=None, learning_rate_s
 		'resume_state': f"resume_state: '{resume_path}'",
 		'pretrain_model_gpt': f"pretrain_model_gpt: './models/tortoise/autoregressive{'_half' if half_p else ''}.pth'",
 
-		'float16': 'true' if half_p else 'false'
+		'float16': 'true' if half_p else 'false',
+		'bitsandbytes': 'true' if bnb else 'false',
 	}
 
 	if resume_path:
@@ -1038,6 +1042,9 @@ def setup_args():
 		'concurrency-count': 2,
 		'output-sample-rate': 44100,
 		'output-volume': 1,
+
+		'training-default-halfp': False,
+		'training-default-bnb': True,
 	}
 
 	if os.path.isfile('./config/exec.json'):
@@ -1067,6 +1074,9 @@ def setup_args():
 	parser.add_argument("--output-sample-rate", type=int, default=default_arguments['output-sample-rate'], help="Sample rate to resample the output to (from 24KHz)")
 	parser.add_argument("--output-volume", type=float, default=default_arguments['output-volume'], help="Adjusts volume of output")
 	
+	parser.add_argument("--training-default-halfp", action='store_true', default=default_arguments['training-default-halfp'], help="Training default: halfp")
+	parser.add_argument("--training-default-bnb", action='store_true', default=default_arguments['training-default-bnb'], help="Training default: bnb")
+	
 	parser.add_argument("--os", default="unix", help="Specifies which OS, easily")
 	args = parser.parse_args()
 
@@ -1093,7 +1103,7 @@ def setup_args():
 	
 	return args
 
-def update_args( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, defer_tts_load, prune_nonfinal_outputs, device_override, sample_batch_size, concurrency_count, output_sample_rate, output_volume ):
+def update_args( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, defer_tts_load, prune_nonfinal_outputs, device_override, sample_batch_size, concurrency_count, output_sample_rate, output_volume, training_default_halfp, training_default_bnb ):
 	global args
 
 	args.listen = listen
@@ -1113,10 +1123,13 @@ def update_args( listen, share, check_for_updates, models_from_local_only, low_v
 	args.concurrency_count = concurrency_count
 	args.output_sample_rate = output_sample_rate
 	args.output_volume = output_volume
+	args.training_default_halfp = training_default_halfp
+	args.training_default_bnb = training_default_bnb
 
 	save_args_settings()
 
 def save_args_settings():
+	global args
 	settings = {
 		'listen': None if args.listen else args.listen,
 		'share': args.share,
@@ -1137,7 +1150,12 @@ def save_args_settings():
 		'concurrency-count': args.concurrency_count,
 		'output-sample-rate': args.output_sample_rate,
 		'output-volume': args.output_volume,
+
+		'training-default-halfp': args.training_default_halfp,
+		'training-default-bnb': args.training_default_bnb,
 	}
+
+	print(settings)
 
 	os.makedirs('./config/', exist_ok=True)
 	with open(f'./config/exec.json', 'w', encoding="utf-8") as f:
