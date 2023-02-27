@@ -537,7 +537,12 @@ def setup_gradio():
 					
 					autoregressive_models = get_autoregressive_models()
 					autoregressive_model_dropdown = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
+					
 					whisper_model_dropdown = gr.Dropdown(["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"], label="Whisper Model", value=args.whisper_model)
+					use_whisper_cpp = gr.Checkbox(label="Use Whisper.cpp", value=args.whisper_cpp)
+					
+					exec_inputs = exec_inputs + [ autoregressive_model_dropdown, whisper_model_dropdown, use_whisper_cpp, training_halfp, training_bnb ]
+
 					with gr.Row():
 						autoregressive_models_update_button = gr.Button(value="Refresh Model List")
 						gr.Button(value="Check for Updates").click(check_for_updates)
@@ -559,22 +564,21 @@ def setup_gradio():
 						outputs=autoregressive_model_dropdown,
 					)
 
-					autoregressive_model_dropdown.change(
-						fn=update_autoregressive_model,
-						inputs=autoregressive_model_dropdown,
-						outputs=None
-					)
-					whisper_model_dropdown.change(
-						fn=update_whisper_model,
-						inputs=whisper_model_dropdown,
-						outputs=None
-					)
-
-					exec_inputs = exec_inputs + [ training_halfp, training_bnb ]
-
-
 				for i in exec_inputs:
 					i.change( fn=update_args, inputs=exec_inputs )
+				
+				autoregressive_model_dropdown.change(
+					fn=update_autoregressive_model,
+					inputs=autoregressive_model_dropdown,
+					outputs=None
+				)
+				"""
+				whisper_model_dropdown.change(
+					fn=update_whisper_model,
+					inputs=whisper_model_dropdown,
+					outputs=None
+				)
+				"""
 
 		# console_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 
