@@ -206,6 +206,7 @@ def import_training_settings_proxy( voice ):
 	outdir = f'./training/{voice}-finetune/'
 
 	in_config_path = f"{indir}/train.yaml"
+	out_config_path = None
 	out_configs = []
 	if os.path.isdir(outdir):
 		out_configs = sorted([d[:-5] for d in os.listdir(outdir) if d[-5:] == ".yaml" ])
@@ -240,7 +241,10 @@ def import_training_settings_proxy( voice ):
 	save_rate = int(config['logger']['save_checkpoint_freq'] / steps_per_iteration)
 
 	statedir = f'{outdir}/training_state/' # NOOO STOP MIXING YOUR CASES
-	resumes = sorted([int(d[:-6]) for d in os.listdir(statedir) if d[-6:] == ".state" ])
+	resumes = []
+	resume_path = None
+	if os.path.isdir(statedir):
+		resumes = sorted([int(d[:-6]) for d in os.listdir(statedir) if d[-6:] == ".state" ])
 
 	if len(resumes) > 0:
 		resume_path = f'{statedir}/{resumes[-1]}.state'
@@ -490,7 +494,7 @@ def setup_gradio():
 
 						with gr.Row():
 							refresh_dataset_list = gr.Button(value="Refresh Dataset List")
-							import_dataset_button = gr.Button(value="Import Dataset")
+							import_dataset_button = gr.Button(value="Reuse/Import Dataset")
 					with gr.Column():
 						save_yaml_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						with gr.Row():

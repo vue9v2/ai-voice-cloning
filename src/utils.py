@@ -600,8 +600,10 @@ class TrainingState():
 						self.it_rate = rate
 					except Exception as e:
 						pass
-
-					message = f'[{self.epoch}/{self.epochs}, {self.it}/{self.its}, {step}/{steps}] [{self.epoch_rate}, {self.it_rate}] [Loss at it {self.losses[-1]["iteration"]}: {self.losses[-1]["loss"]}] [ETA: {self.eta_hhmmss}]'
+					last_loss = ""
+					if len(self.losses) > 0:
+						last_loss = f'[Loss @ it. {self.losses[-1]["iteration"]}: {self.losses[-1]["loss"]}]'
+					message = f'[{self.epoch}/{self.epochs}, {self.it}/{self.its}, {step}/{steps}] [{self.epoch_rate}, {self.it_rate}] {last_loss} [ETA: {self.eta_hhmmss}]'
 
 			if lapsed:
 				self.epoch = self.epoch + 1
@@ -1180,9 +1182,13 @@ def setup_args():
 
 	if os.path.isfile('./config/exec.json'):
 		with open(f'./config/exec.json', 'r', encoding="utf-8") as f:
-			overrides = json.load(f)
-			for k in overrides:
-				default_arguments[k] = overrides[k]
+			try:
+				overrides = json.load(f)
+				for k in overrides:
+					default_arguments[k] = overrides[k]
+			except Exception as e:
+				print(e)
+				pass
 
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--share", action='store_true', default=default_arguments['share'], help="Lets Gradio return a public URL to use anywhere")
