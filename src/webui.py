@@ -508,6 +508,15 @@ def setup_gradio():
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output")
 						training_buffer_size = gr.Slider(label="Console Buffer Size", minimum=4, maximum=32, value=8)
+						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous Datasets", minimum=0, maximum=8, value=0)
+
+						training_loss_graph = gr.LinePlot(label="Loss Rates",
+							x="iteration",
+							y="loss_gpt_total",
+							title="Loss Rates",
+							width=600,
+							height=350
+						)
 		with gr.Tab("Settings"):
 			with gr.Row():
 				exec_inputs = []
@@ -720,8 +729,19 @@ def setup_gradio():
 				training_configs,
 				verbose_training,
 				training_buffer_size,
+				training_keep_x_past_datasets,
 			],
-			outputs=training_output #console_output
+			outputs=[
+				training_output,
+			],
+		)
+		training_output.change(
+			fn=update_training_dataplot,
+			inputs=None,
+			outputs=[
+				training_loss_graph,
+			],
+			show_progress=False,
 		)
 		stop_training_button.click(stop_training,
 			inputs=None,
