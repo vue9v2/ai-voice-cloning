@@ -543,7 +543,7 @@ class TrainingState():
 			print("Removing", path)
 			os.remove(path)
 
-	def parse(self, line, verbose=False, buffer_size=8, progress=None ):
+	def parse(self, line, verbose=False, buffer_size=8, keep_x_past_datasets=0, progress=None ):
 		self.buffer.append(f'{line}')
 
 		# rip out iteration info
@@ -646,7 +646,7 @@ class TrainingState():
 				print(f'{"{:.3f}".format(percent*100)}% {message}')
 				self.buffer.append(f'{"{:.3f}".format(percent*100)}% {message}')
 
-				self.cleanup_old()
+				self.cleanup_old(keep=keep_x_past_datasets)
 
 		self.buffer = self.buffer[-buffer_size:]
 		if verbose or not self.training_started:
@@ -668,7 +668,7 @@ def run_training(config_path, verbose=False, buffer_size=8, keep_x_past_datasets
 
 	for line in iter(training_state.process.stdout.readline, ""):
 		
-		res = training_state.parse( line=line, verbose=verbose, buffer_size=buffer_size, progress=progress )
+		res = training_state.parse( line=line, verbose=verbose, buffer_size=buffer_size, keep_x_past_datasets=keep_x_past_datasets, progress=progress )
 		print(f"[Training] [{datetime.now().isoformat()}] {line[:-1]}")
 		if res:
 			yield res
