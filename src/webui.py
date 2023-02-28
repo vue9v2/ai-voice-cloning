@@ -129,6 +129,9 @@ history_headers = {
 	"Rep Pen": "repetition_penalty",
 	"Cond-Free K": "cond_free_k",
 	"Time": "time",
+	"Datetime": "datetime",
+	"Model": "model",
+	"Model Hash": "model_hash",
 }
 
 def history_view_results( voice ):
@@ -147,7 +150,7 @@ def history_view_results( voice ):
 		for k in history_headers:
 			v = file
 			if k != "Name":
-				v = metadata[history_headers[k]]
+				v = metadata[history_headers[k]] if history_headers[k] in metadata else '?'
 			values.append(v)
 
 
@@ -173,8 +176,6 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 			f.write(latents)
 		
 		latents = f'{outdir}/cond_latents.pth'
-
-	print(j, latents)
 
 	return (
 		gr.update(value=j, visible=j is not None),
