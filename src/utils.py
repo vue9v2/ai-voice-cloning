@@ -482,10 +482,7 @@ class TrainingState():
 		self.eta = "?"
 		self.eta_hhmmss = "?"
 
-		self.losses = {
-			'iteration': [],
-			'loss_gpt_total': []
-		}
+		self.losses = []
 
 
 		self.load_losses()
@@ -522,8 +519,14 @@ class TrainingState():
 
 		for k in infos:
 			if 'loss_gpt_total' in infos[k]:
+				# self.losses.append([ int(k), infos[k]['loss_text_ce'], infos[k]['loss_mel_ce'], infos[k]['loss_gpt_total'] ])
+				self.losses.append({ "iteration": int(k), "loss": infos[k]['loss_text_ce'], "type": "text_ce" })
+				self.losses.append({ "iteration": int(k), "loss": infos[k]['loss_mel_ce'], "type": "mel_ce" })
+				self.losses.append({ "iteration": int(k), "loss": infos[k]['loss_gpt_total'], "type": "gpt_total" })
+				"""
 				self.losses['iteration'].append(int(k))
 				self.losses['loss_gpt_total'].append(infos[k]['loss_gpt_total'])
+				"""
 
 	def cleanup_old(self, keep=2):
 		if keep <= 0:
@@ -593,7 +596,7 @@ class TrainingState():
 					except Exception as e:
 						pass
 
-					message = f'[{self.epoch}/{self.epochs}, {self.it}/{self.its}, {step}/{steps}] [{self.epoch_rate}, {self.it_rate}] [Loss at it {self.losses["iteration"][-1]}: {self.losses["loss_gpt_total"][-1]}] [ETA: {self.eta_hhmmss}]'
+					message = f'[{self.epoch}/{self.epochs}, {self.it}/{self.its}, {step}/{steps}] [{self.epoch_rate}, {self.it_rate}] [Loss at it {self.losses[-1]["iteration"]}: {self.losses[-1]["loss"]}] [ETA: {self.eta_hhmmss}]'
 
 			if lapsed:
 				self.epoch = self.epoch + 1
@@ -631,8 +634,18 @@ class TrainingState():
 				if 'loss_gpt_total' in self.info:
 					self.status = f"Total loss at epoch {self.epoch}: {self.info['loss_gpt_total']}"
 
+					self.losses.append({ "iteration": self.it, "loss": self.info['loss_text_ce'], "type": "text_ce" })
+					self.losses.append({ "iteration": self.it, "loss": self.info['loss_mel_ce'], "type": "mel_ce" })
+					self.losses.append({ "iteration": self.it, "loss": self.info['loss_gpt_total'], "type": "gpt_total" })
+					"""
+					self.losses.append([int(k), self.info['loss_text_ce'], "loss_text_ce"])
+					self.losses.append([int(k), self.info['loss_mel_ce'], "loss_mel_ce"])
+					self.losses.append([int(k), self.info['loss_gpt_total'], "loss_gpt_total"])
+					"""
+					"""
 					self.losses['iteration'].append(self.it)
 					self.losses['loss_gpt_total'].append(self.info['loss_gpt_total'])
+					"""
 
 					verbose = True
 			elif line.find('Saving models and training states') >= 0:

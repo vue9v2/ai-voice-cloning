@@ -508,12 +508,14 @@ def setup_gradio():
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output")
 						training_buffer_size = gr.Slider(label="Console Buffer Size", minimum=4, maximum=32, value=8)
-						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous Datasets", minimum=0, maximum=8, value=0)
+						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0)
 
 						training_loss_graph = gr.LinePlot(label="Loss Rates",
 							x="iteration",
-							y="loss_gpt_total",
+							y="loss",
 							title="Loss Rates",
+							color="type",
+							tooltip=['iteration', 'loss', 'type'],
 							width=600,
 							height=350
 						)
@@ -539,7 +541,7 @@ def setup_gradio():
 				with gr.Column():
 					exec_inputs = exec_inputs + [
 						gr.Number(label="Sample Batch Size", precision=0, value=args.sample_batch_size),
-						gr.Number(label="Concurrency Count", precision=0, value=args.concurrency_count),
+						gr.Number(label="Gradio Concurrency Count", precision=0, value=args.concurrency_count),
 						gr.Number(label="Output Sample Rate", precision=0, value=args.output_sample_rate),
 						gr.Slider(label="Output Volume", minimum=0, maximum=2, value=args.output_volume),
 					]
