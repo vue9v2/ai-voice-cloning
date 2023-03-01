@@ -380,7 +380,7 @@ def setup_gradio():
 					prompt = gr.Textbox(lines=1, label="Custom Emotion + Prompt (if selected)")
 					voice = gr.Dropdown(choices=voice_list_with_defaults, label="Voice", type="value", value=voice_list_with_defaults[0]) # it'd be very cash money if gradio was able to default to the first value in the list without this shit
 					mic_audio = gr.Audio( label="Microphone Source", source="microphone", type="filepath" )
-					voice_latents_chunks = gr.Slider(label="Voice Chunks", minimum=1, maximum=64, value=1, step=1)
+					voice_latents_chunks = gr.Slider(label="Voice Chunks", minimum=1, maximum=128, value=1, step=1)
 					with gr.Row():
 						refresh_voices = gr.Button(value="Refresh Voice List")
 						recompute_voice_latents = gr.Button(value="(Re)Compute Voice Latents")
@@ -538,12 +538,12 @@ def setup_gradio():
 						training_buffer_size = gr.Slider(label="Console Buffer Size", minimum=4, maximum=32, value=8)
 						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
 
-						training_loss_graph = gr.LinePlot(label="Loss Rates",
-							x="iteration",
-							y="loss",
-							title="Loss Rates",
+						training_loss_graph = gr.LinePlot(label="Training Metrics",
+							x="step",
+							y="value",
+							title="Training Metrics",
 							color="type",
-							tooltip=['iteration', 'loss', 'type'],
+							tooltip=['step', 'value', 'type'],
 							width=600,
 							height=350
 						)
