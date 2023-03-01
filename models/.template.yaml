@@ -83,7 +83,7 @@ steps:
     losses:
       text_ce:
         type: direct
-        weight: .01
+        weight: ${text_ce_lr_weight}
         key: loss_text_ce
       mel_ce:
         type: direct

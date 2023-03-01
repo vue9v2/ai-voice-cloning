@@ -489,7 +489,6 @@ class TrainingState():
 
 		self.losses = []
 
-
 		self.load_losses()
 		self.cleanup_old(keep=keep_x_past_datasets)
 		self.spawn_process()
@@ -536,6 +535,9 @@ class TrainingState():
 	def cleanup_old(self, keep=2):
 		if keep <= 0:
 			return
+
+		if not os.path.isdir(self.dataset_dir):
+			return
 			
 		models = sorted([ int(d[:-8]) for d in os.listdir(f'{self.dataset_dir}/models/') if d[-8:] == "_gpt.pth" ])
 		states = sorted([ int(d[:-6]) for d in os.listdir(f'{self.dataset_dir}/training_state/') if d[-6:] == ".state" ])
@@ -553,6 +555,8 @@ class TrainingState():
 
 	def parse(self, line, verbose=False, buffer_size=8, keep_x_past_datasets=0, progress=None ):
 		self.buffer.append(f'{line}')
+
+		should_return = False
 
 		# rip out iteration info
 		if not self.training_started:
@@ -654,7 +658,7 @@ class TrainingState():
 					self.losses['loss_gpt_total'].append(self.info['loss_gpt_total'])
 					"""
 
-					verbose = True
+					should_return = True
 			elif line.find('Saving models and training states') >= 0:
 				self.checkpoint = self.checkpoint + 1
 
@@ -668,8 +672,11 @@ class TrainingState():
 
 				self.cleanup_old(keep=keep_x_past_datasets)
 
+		if verbose and not self.training_started:
+			should_return = True
+
 		self.buffer = self.buffer[-buffer_size:]
-		if verbose or not self.training_started:
+		if should_return:
 			return "".join(self.buffer)
 
 def run_training(config_path, verbose=False, buffer_size=8, keep_x_past_datasets=0, progress=gr.Progress(track_tqdm=True)):
@@ -730,10 +737,10 @@ def stop_training():
 	print("Killing training process...")
 	training_state.killed = True
 	training_state.process.stdout.close()
-	training_state.process.kill()
+	training_state.process.terminate()
 	return_code = training_state.process.wait()
 	training_state = None
-	return "Training cancelled"
+	return f"Training cancelled: {return_code}"
 
 def get_halfp_model_path():
 	autoregressive_model_path = get_model_path('autoregressive.pth')
@@ -828,7 +835,7 @@ EPOCH_SCHEDULE = [ 9, 18, 25, 33 ]
 def schedule_learning_rate( iterations ):
 	return [int(iterations * d) for d in EPOCH_SCHEDULE]
 
-def optimize_training_settings( epochs, learning_rate, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, bnb, voice ):
+def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, bnb, source_model, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -882,6 +889,7 @@ def optimize_training_settings( epochs, learning_rate, learning_rate_schedule, b
 
 	return (
 		learning_rate,
+		text_ce_lr_weight,
 		learning_rate_schedule,
 		batch_size,
 		mega_batch_factor,
@@ -891,7 +899,10 @@ def optimize_training_settings( epochs, learning_rate, learning_rate_schedule, b
 		messages
 	)
 
-def save_training_settings( iterations=None, learning_rate=None, learning_rate_schedule=None, batch_size=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None, bnb=None ):
+def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weight=None, learning_rate_schedule=None, batch_size=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None, bnb=None, source_model=None ):
+	if not source_model:
+		source_model = f"./models/tortoise/autoregressive{'_half' if half_p else ''}.pth"
+
 	settings = {
 		"iterations": iterations if iterations else 500,
 		"batch_size": batch_size if batch_size else 64,
@@ -906,8 +917,10 @@ def save_training_settings( iterations=None, learning_rate=None, learning_rate_s
 		"validation_name": validation_name if validation_name else "finetune",
 		"validation_path": validation_path if validation_path else "./training/finetune/train.txt",
 
+		"text_ce_lr_weight": text_ce_lr_weight if text_ce_lr_weight else 0.01,
+
 		'resume_state': f"resume_state: '{resume_path}'",
-		'pretrain_model_gpt': f"pretrain_model_gpt: './models/tortoise/autoregressive{'_half' if half_p else ''}.pth'",
+		'pretrain_model_gpt': f"pretrain_model_gpt: '{source_model}'",
 
 		'float16': 'true' if half_p else 'false',
 		'bitsandbytes': 'true' if bnb else 'false',
