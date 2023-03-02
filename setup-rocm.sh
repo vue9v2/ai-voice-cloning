@@ -15,6 +15,8 @@ python3 -m pip install -e ./tortoise-tts/ # install TorToiSe
 python3 -m pip install -r ./requirements.txt # install local requirements
 # swap to ROCm version of BitsAndBytes
 pip3 uninstall bitsandbytes
-pip3 install git+https://github.com/broncotc/bitsandbytes-rocm
+
+# gives errors
+# pip3 install git+https://github.com/broncotc/bitsandbytes-rocm
 
 deactivate
