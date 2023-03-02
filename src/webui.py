@@ -527,17 +527,9 @@ def setup_gradio():
 				with gr.Row():
 					with gr.Column():
 						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_list())
-						refresh_configs = gr.Button(value="Refresh Configurations")
 						with gr.Row():
-							start_training_button = gr.Button(value="Train")
-							stop_training_button = gr.Button(value="Stop")
-							reconnect_training_button = gr.Button(value="Reconnect")
-					with gr.Column():
-						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
-						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
-						training_buffer_size = gr.Slider(label="Console Buffer Size", minimum=4, maximum=32, value=8)
-						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
-
+							refresh_configs = gr.Button(value="Refresh Configurations")
+						
 						training_loss_graph = gr.LinePlot(label="Training Metrics",
 							x="step",
 							y="value",
@@ -545,8 +537,19 @@ def setup_gradio():
 							color="type",
 							tooltip=['step', 'value', 'type'],
 							width=600,
-							height=350
+							height=350,
 						)
+						view_losses = gr.Button(value="View Losses")
+
+					with gr.Column():
+						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
+						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
+						training_buffer_size = gr.Slider(label="Console Buffer Size", minimum=4, maximum=32, value=8)
+						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
+						with gr.Row():
+							start_training_button = gr.Button(value="Train")
+							stop_training_button = gr.Button(value="Stop")
+							reconnect_training_button = gr.Button(value="Reconnect")
 		with gr.Tab("Settings"):
 			with gr.Row():
 				exec_inputs = []
@@ -763,6 +766,17 @@ def setup_gradio():
 			],
 			show_progress=False,
 		)
+
+		view_losses.click(
+			fn=update_training_dataplot,
+			inputs=[
+				training_configs
+			],
+			outputs=[
+				training_loss_graph,
+			],
+		)
+
 		stop_training_button.click(stop_training,
 			inputs=None,
 			outputs=training_output #console_output

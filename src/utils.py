@@ -477,7 +477,7 @@ def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm
 
 # superfluous, but it cleans up some things
 class TrainingState():
-	def __init__(self, config_path, keep_x_past_datasets=0):
+	def __init__(self, config_path, keep_x_past_datasets=0, start=True):
 		self.cmd = ['train.bat', config_path] if os.name == "nt" else ['bash', './train.sh', config_path]
 
 		# parse config to get its iteration
@@ -527,8 +527,10 @@ class TrainingState():
 		self.losses = []
 
 		self.load_losses()
-		self.cleanup_old(keep=keep_x_past_datasets)
-		self.spawn_process()
+		if keep_x_past_datasets > 0:
+			self.cleanup_old(keep=keep_x_past_datasets)
+		if start:
+			self.spawn_process()
 
 	def spawn_process(self):
 		print("Spawning process: ", " ".join(self.cmd))
@@ -778,11 +780,19 @@ def get_training_losses():
 		return
 	return pd.DataFrame(training_state.losses)
 
-def update_training_dataplot():
+def update_training_dataplot(config_path=None):
 	global training_state
-	if not training_state or not training_state.losses:
-		return
-	return gr.LinePlot.update(value=pd.DataFrame(training_state.losses))
+	update = None
+
+	if not training_state:
+		training_state = TrainingState(config_path=config_path, start=False)
+		update = gr.LinePlot.update(value=pd.DataFrame(training_state.losses))
+		del training_state
+		training_state = None
+	else:
+		update = gr.LinePlot.update(value=pd.DataFrame(training_state.losses))
+
+	return update
 
 def reconnect_training(verbose=False, buffer_size=8, progress=gr.Progress(track_tqdm=True)):
 	global training_state
