@@ -385,19 +385,6 @@ def setup_gradio():
 						refresh_voices = gr.Button(value="Refresh Voice List")
 						recompute_voice_latents = gr.Button(value="(Re)Compute Voice Latents")
 
-					def update_baseline_for_latents_chunks( voice ):
-						path = f'{get_voice_dir()}/{voice}/'
-						if not os.path.isdir(path):
-							return 1
-
-						files = os.listdir(path)
-						count = 0
-						for file in files:
-							if file[-4:] == ".wav":
-								count += 1
-
-						return count if count > 0 else 1
-
 					voice.change(
 						fn=update_baseline_for_latents_chunks,
 						inputs=voice,
@@ -575,7 +562,7 @@ def setup_gradio():
 					exec_inputs = exec_inputs + [
 						gr.Number(label="Sample Batch Size", precision=0, value=args.sample_batch_size),
 						gr.Number(label="Gradio Concurrency Count", precision=0, value=args.concurrency_count),
-						gr.Number(label="Output Sample Rate", precision=0, value=args.output_sample_rate),
+						gr.Number(label="Auto-Calculate Voice Chunk Duration (in seconds)", precision=0, value=args.autocalculate_voice_chunk_duration_size),
 						gr.Slider(label="Output Volume", minimum=0, maximum=2, value=args.output_volume),
 					]
 					
@@ -594,6 +581,7 @@ def setup_gradio():
 							inputs=autoregressive_model_dropdown,
 							outputs=None
 						)
+						# kill_button = gr.Button(value="Close UI")
 
 					def update_model_list_proxy( val ):
 						autoregressive_models = get_autoregressive_models()
@@ -813,6 +801,18 @@ def setup_gradio():
 			inputs=training_settings,
 			outputs=save_yaml_output #console_output
 		)
+
+		"""
+		def kill_process():
+			ui.close()
+			exit()
+
+		kill_button.click(
+			kill_process,
+			inputs=None,
+			outputs=None
+		)
+		"""
 
 		if os.path.isfile('./config/generate.json'):
 			ui.load(import_generate_settings, inputs=None, outputs=input_settings)
