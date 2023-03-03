@@ -898,8 +898,11 @@ def prepare_dataset( files, outdir, language=None, progress=None ):
 
 			torchaudio.save(f"{outdir}/{sliced_name}", sliced_waveform, sampling_rate)
 
-			transcription.append(f"{sliced_name}|{segment['text'].strip()}")
 			idx = idx + 1
+			line = f"{sliced_name}|{segment['text'].strip()}"
+			transcription.append(line)
+			with open(f'{outdir}/train.txt', 'a', encoding="utf-8") as f:
+				f.write(f'{line}\n')
 	
 	with open(f'{outdir}/whisper.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(results, indent='\t'))
@@ -1350,7 +1353,7 @@ def update_args( listen, share, check_for_updates, models_from_local_only, low_v
 def save_args_settings():
 	global args
 	settings = {
-		'listen': None if args.listen else args.listen,
+		'listen': None if not args.listen else args.listen,
 		'share': args.share,
 		'low-vram':args.low_vram,
 		'check-for-updates':args.check_for_updates,
@@ -1587,7 +1590,7 @@ def load_whisper_model(name=None, progress=None, language=b'en'):
 	notify_progress(f"Loading Whisper model: {args.whisper_model}", progress)
 	if args.whisper_cpp:
 		from whispercpp import Whisper
-		whisper_model = Whisper(name, models_dir='./models/', language=language)
+		whisper_model = Whisper(name, models_dir='./models/', language=language.encode('ascii'))
 	else:
 		import whisper
 		whisper_model = whisper.load_model(args.whisper_model)
