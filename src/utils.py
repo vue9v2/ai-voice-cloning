@@ -378,8 +378,16 @@ def generate(
 
 
 	if voice and voice != "random" and conditioning_latents is not None:
-		with open(f'{get_voice_dir()}/{voice}/cond_latents.pth', 'rb') as f:
-			info['latents'] = base64.b64encode(f.read()).decode("ascii")
+		latents_path = f'{get_voice_dir()}/{voice}/cond_latents.pth'
+
+		if hasattr(tts, 'autoregressive_model_hash'):
+			latents_path = f'{get_voice_dir()}/{voice}/cond_latents_{tts.autoregressive_model_hash[:8]}.pth'
+
+		try:
+			with open(latents_path, 'rb') as f:
+				info['latents'] = base64.b64encode(f.read()).decode("ascii")
+		except Exception as e:
+			pass
 
 	if args.embed_output_metadata:
 		for name in progress.tqdm(audio_cache, desc="Embedding metadata..."):
