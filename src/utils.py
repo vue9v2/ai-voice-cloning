@@ -1316,6 +1316,8 @@ def setup_args():
 
 	if args.listen_port is not None:
 		args.listen_port = int(args.listen_port)
+		if args.listen_port == 0:
+			args.listen_port = None
 	
 	return args
 
@@ -1476,10 +1478,10 @@ def load_tts( restart=False, model=None ):
 
 	tts_loading = True
 	try:
-		tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=args.autoregressive_model, use_bigvgan=args.use_bigvgan_vocoder)
+		tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=args.autoregressive_model)
 	except Exception as e:
 		tts = TextToSpeech(minor_optimizations=not args.low_vram)
-		load_autoregressive_model(args.autoregressive_model)
+		update_autoregressive_model(args.autoregressive_model)
 
 	if not hasattr(tts, 'autoregressive_model_hash'):
 		tts.autoregressive_model_hash = hash_file(tts.autoregressive_model_path)
