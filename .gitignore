@@ -1,7 +1,8 @@
 # ignores user files
-/tortoise-venv/
-/tortoise/voices/
-/models/
+/venv/
+/voices/*
+/models/*
+/training/*
 /config/*
 
 # Byte-compiled / optimized / DLL files
