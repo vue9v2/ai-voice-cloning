@@ -568,6 +568,7 @@ def setup_gradio():
 						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
 						gr.Checkbox(label="Do Not Load TTS On Startup", value=args.defer_tts_load),
 						gr.Checkbox(label="Delete Non-Final Output", value=args.prune_nonfinal_outputs),
+						gr.Checkbox(label="Use BigVGAN Vocoder", value=args.use_bigvgan_vocoder),
 						gr.Textbox(label="Device Override", value=args.device_override),
 					]
 				with gr.Column():
