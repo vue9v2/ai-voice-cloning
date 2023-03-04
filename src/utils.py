@@ -573,6 +573,9 @@ class TrainingState():
 		infos = {}
 		highest_step = self.last_info_check_at
 
+		if not update:
+			self.losses = []
+
 		if use_tensorboard:
 			logs = sorted([f'{self.dataset_dir}/tb_logger/{d}' for d in os.listdir(f'{self.dataset_dir}/tb_logger/') if d[:6] == "events" ])
 			if update:
@@ -816,6 +819,7 @@ def update_training_dataplot(config_path=None):
 			del training_state
 			training_state = None
 	elif training_state.losses:
+		training_state.load_losses()
 		update = gr.LinePlot.update(value=pd.DataFrame(training_state.losses))
 
 	return update
@@ -837,7 +841,8 @@ def stop_training():
 	print("Killing training process...")
 	training_state.killed = True
 	training_state.process.stdout.close()
-	training_state.process.terminate()
+	#training_state.process.terminate()
+	training_state.process.send_signal(signal.SIGINT)
 	return_code = training_state.process.wait()
 	training_state = None
 	return f"Training cancelled: {return_code}"
@@ -938,7 +943,7 @@ EPOCH_SCHEDULE = [ 9, 18, 25, 33 ]
 def schedule_learning_rate( iterations, schedule=EPOCH_SCHEDULE ):
 	return [int(iterations * d) for d in schedule]
 
-def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, bnb, source_model, voice ):
+def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, resume_path, half_p, bnb, source_model, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -959,12 +964,11 @@ def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learni
 		batch_size = int(lines / nearest_slice)
 		messages.append(f"Batch size not neatly divisible by dataset size, adjusting batch size to: {batch_size} ({nearest_slice} steps per epoch)")
 	
-	if batch_size == 1 and mega_batch_factor != 1:
-		mega_batch_factor = 1
-		messages.append(f"Mega batch factor is too large for the given batch size, clamping mega batch factor to: {mega_batch_factor}")
-	elif batch_size / mega_batch_factor < 2:
-		mega_batch_factor = int(batch_size / 2)
-		messages.append(f"Mega batch factor is too large for the given batch size, clamping mega batch factor to: {mega_batch_factor}")
+	if gradient_accumulation_size == 0:
+		gradient_accumulation_size = 1
+	elif batch_size % gradient_accumulation_size != 0:
+		gradient_accumulation_size = int(batch_size / gradient_accumulation_size)
+		messages.append(f"Batch size is not evenly divisible by the gradient accumulation size, adjusting gradient accumulation size to: {gradient_accumulation_size}")
 
 	iterations = calc_iterations(epochs=epochs, lines=lines, batch_size=batch_size)
 
@@ -980,13 +984,17 @@ def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learni
 		resume_path = None
 		messages.append("Resume path specified, but does not exist. Disabling...")
 
-	if half_p:
-		messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
-		if not os.path.exists(get_halfp_model_path()):
-			convert_to_halfp()
-	
 	if bnb:
 		messages.append("BitsAndBytes requested. Please note this is ! EXPERIMENTAL !")
+
+	if half_p:
+		if bnb:
+			half_p = False
+			messages.append("Half Precision requested, but BitsAndBytes is also requested. Due to redundancies, disabling half precision...")
+		else:
+			messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
+			if not os.path.exists(get_halfp_model_path()):
+				convert_to_halfp()	
 
 	messages.append(f"For {epochs} epochs with {lines} lines in batches of {batch_size}, iterating for {iterations} steps ({int(iterations / epochs)} steps per epoch)")
 
@@ -995,14 +1003,14 @@ def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learni
 		text_ce_lr_weight,
 		learning_rate_schedule,
 		batch_size,
-		mega_batch_factor,
+		gradient_accumulation_size,
 		print_rate,
 		save_rate,
 		resume_path,
 		messages
 	)
 
-def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weight=None, learning_rate_schedule=None, batch_size=None, mega_batch_factor=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None, bnb=None, source_model=None ):
+def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weight=None, learning_rate_schedule=None, batch_size=None, gradient_accumulation_size=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None, bnb=None, source_model=None ):
 	if not source_model:
 		source_model = f"./models/tortoise/autoregressive{'_half' if half_p else ''}.pth"
 
@@ -1011,8 +1019,8 @@ def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weig
 		"batch_size": batch_size if batch_size else 64,
 		"learning_rate": learning_rate if learning_rate else 1e-5,
 		"gen_lr_steps": learning_rate_schedule if learning_rate_schedule else EPOCH_SCHEDULE,
-		"mega_batch_factor": mega_batch_factor if mega_batch_factor else 4,
-		"print_rate": print_rate if print_rate else 50,
+		"gradient_accumulation_size": gradient_accumulation_size if gradient_accumulation_size else 4,
+		"print_rate": print_rate if print_rate else 1,
 		"save_rate": save_rate if save_rate else 50,
 		"name": name if name else "finetune",
 		"dataset_name": dataset_name if dataset_name else "finetune",

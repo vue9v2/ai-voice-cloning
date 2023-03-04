@@ -227,9 +227,8 @@ def import_training_settings_proxy( voice ):
 		messages.append(f"Basing epoch size to {lines} lines")
 
 	batch_size = config['datasets']['train']['batch_size']
-	mega_batch_factor = config['train']['mega_batch_factor']
+	gradient_accumulation_size = config['train']['mega_batch_factor']
 
-	
 	iterations = config['train']['niter']
 	steps_per_iteration = int(lines / batch_size)
 	epochs = int(iterations / steps_per_iteration)
@@ -276,7 +275,7 @@ def import_training_settings_proxy( voice ):
 		text_ce_lr_weight,
 		learning_rate_schedule,
 		batch_size,
-		mega_batch_factor,
+		gradient_accumulation_size,
 		print_rate,
 		save_rate,
 		resume_path,
@@ -287,7 +286,7 @@ def import_training_settings_proxy( voice ):
 	)
 
 
-def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, bnb, source_model, voice ):
+def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, resume_path, half_p, bnb, source_model, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -318,7 +317,7 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 		learning_rate=learning_rate,
 		text_ce_lr_weight=text_ce_lr_weight,
 		learning_rate_schedule=learning_rate_schedule,
-		mega_batch_factor=mega_batch_factor,
+		gradient_accumulation_size=gradient_accumulation_size,
 		print_rate=print_rate,
 		save_rate=save_rate,
 		name=name,
@@ -489,7 +488,7 @@ def setup_gradio():
 						with gr.Row():
 							training_settings = training_settings + [
 								gr.Number(label="Batch Size", value=128, precision=0),
-								gr.Number(label="Mega Batch Factor", value=4, precision=0),
+								gr.Number(label="Gradient Accumulation Size", value=4, precision=0),
 							]
 						with gr.Row():
 							training_settings = training_settings + [
@@ -534,8 +533,10 @@ def setup_gradio():
 					with gr.Column():
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
-						training_buffer_size = gr.Slider(label="Console Buffer Size", minimum=4, maximum=32, value=8)
-						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
+						
+						with gr.Row():
+							training_buffer_size = gr.Slider(label="Console Buffer Size", minimum=4, maximum=32, value=8)
+							training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
 						training_gpu_count = gr.Number(label="GPUs", value=1)
 						with gr.Row():
 							start_training_button = gr.Button(value="Train")
