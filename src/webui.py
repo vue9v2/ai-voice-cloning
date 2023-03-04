@@ -307,7 +307,10 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 
 	if not learning_rate_schedule:
 		learning_rate_schedule = EPOCH_SCHEDULE
-	learning_rate_schedule = schedule_learning_rate( iterations / epochs )
+	elif isinstance(learning_rate_schedule,str):
+		learning_rate_schedule = json.loads(learning_rate_schedule)
+
+	learning_rate_schedule = schedule_learning_rate( iterations / epochs, learning_rate_schedule )
 
 	messages.append(save_training_settings(
 		iterations=iterations,

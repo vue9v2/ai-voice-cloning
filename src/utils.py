@@ -935,8 +935,8 @@ def calc_iterations( epochs, lines, batch_size ):
 	return iterations
 
 EPOCH_SCHEDULE = [ 9, 18, 25, 33 ]
-def schedule_learning_rate( iterations ):
-	return [int(iterations * d) for d in EPOCH_SCHEDULE]
+def schedule_learning_rate( iterations, schedule=EPOCH_SCHEDULE ):
+	return [int(iterations * d) for d in schedule]
 
 def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, mega_batch_factor, print_rate, save_rate, resume_path, half_p, bnb, source_model, voice ):
 	name = f"{voice}-finetune"
