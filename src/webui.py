@@ -16,6 +16,7 @@ from datetime import datetime
 
 import tortoise.api
 from tortoise.utils.audio import get_voice_dir, get_voices
+from tortoise.utils.device import get_device_count
 
 from utils import *
 
@@ -536,7 +537,7 @@ def setup_gradio():
 						
 						with gr.Row():
 							training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
-							training_gpu_count = gr.Number(label="GPUs", value=1)
+							training_gpu_count = gr.Number(label="GPUs", value=get_device_count())
 						with gr.Row():
 							start_training_button = gr.Button(value="Train")
 							stop_training_button = gr.Button(value="Stop")
