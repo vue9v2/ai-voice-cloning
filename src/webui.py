@@ -268,6 +268,8 @@ def import_training_settings_proxy( voice ):
 	if "ext" in config and "bitsandbytes" in config["ext"]:
 		bnb = config["ext"]["bitsandbytes"]
 
+	workers = config['datasets']['train']['n_workers']
+
 	messages = "\n".join(messages)
 
 	return (
@@ -282,12 +284,13 @@ def import_training_settings_proxy( voice ):
 		resume_path,
 		half_p,
 		bnb,
+		workers,
 		source_model,
 		messages
 	)
 
 
-def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, resume_path, half_p, bnb, source_model, voice ):
+def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, resume_path, half_p, bnb, workers, source_model, voice ):
 	name = f"{voice}-finetune"
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
@@ -330,6 +333,7 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 		resume_path=resume_path,
 		half_p=half_p,
 		bnb=bnb,
+		workers=workers,
 		source_model=source_model,
 	))
 	return "\n".join(messages)
@@ -466,7 +470,7 @@ def setup_gradio():
 					with gr.Column():
 						dataset_settings = [
 							gr.Dropdown( choices=voice_list, label="Dataset Source", type="value", value=voice_list[0] if len(voice_list) > 0 else "" ),
-							gr.Textbox(label="Language", placeholder="English")
+							gr.Textbox(label="Language", value="en")
 						]
 						prepare_dataset_button = gr.Button(value="Prepare")
 					with gr.Column():
@@ -499,11 +503,16 @@ def setup_gradio():
 						training_settings = training_settings + [
 							gr.Textbox(label="Resume State Path", placeholder="./training/${voice}-finetune/training_state/${last_state}.state"),
 						]
-						training_halfp = gr.Checkbox(label="Half Precision", value=args.training_default_halfp)
-						training_bnb = gr.Checkbox(label="BitsAndBytes", value=args.training_default_bnb)
+
+						with gr.Row():
+							training_halfp = gr.Checkbox(label="Half Precision", value=args.training_default_halfp)
+							training_bnb = gr.Checkbox(label="BitsAndBytes", value=args.training_default_bnb)
+
+						training_workers = gr.Number(label="Worker Processes", value=2, precision=0)
+
 						source_model = gr.Dropdown( choices=autoregressive_models, label="Source Model", type="value", value=autoregressive_models[0] )
 						dataset_list_dropdown = gr.Dropdown( choices=dataset_list, label="Dataset", type="value", value=dataset_list[0] if len(dataset_list) else ""  )
-						training_settings = training_settings + [ training_halfp, training_bnb, source_model, dataset_list_dropdown ]
+						training_settings = training_settings + [ training_halfp, training_bnb, training_workers, source_model, dataset_list_dropdown ]
 
 						with gr.Row():
 							refresh_dataset_list = gr.Button(value="Refresh Dataset List")
@@ -572,7 +581,7 @@ def setup_gradio():
 					
 					autoregressive_model_dropdown = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
 					
-					whisper_model_dropdown = gr.Dropdown(["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large"], label="Whisper Model", value=args.whisper_model)
+					whisper_model_dropdown = gr.Dropdown(WHISPER_MODELS, label="Whisper Model", value=args.whisper_model)
 					use_whisper_cpp = gr.Checkbox(label="Use Whisper.cpp", value=args.whisper_cpp)
 					
 					exec_inputs = exec_inputs + [ autoregressive_model_dropdown, whisper_model_dropdown, use_whisper_cpp, training_halfp, training_bnb ]
@@ -797,7 +806,7 @@ def setup_gradio():
 		)
 		import_dataset_button.click(import_training_settings_proxy,
 			inputs=dataset_list_dropdown,
-			outputs=training_settings[:11] + [save_yaml_output] #console_output
+			outputs=training_settings[:13] + [save_yaml_output] #console_output
 		)
 		save_yaml_button.click(save_training_settings_proxy,
 			inputs=training_settings,

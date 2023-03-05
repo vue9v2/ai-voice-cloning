@@ -11,7 +11,7 @@ use_tb_logger: true
 datasets:
   train:
     name: ${dataset_name}
-    n_workers: 8
+    n_workers: ${workers}
     batch_size: ${batch_size}
     mode: paired_voice_audio
     path: ${dataset_path}
