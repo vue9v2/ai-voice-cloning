@@ -233,7 +233,7 @@ def generate(
 		if emotion == "Custom":
 			if prompt and prompt.strip() != "":
 				cut_text = f"[{prompt},] {cut_text}"
-		else:
+		elif emotion != "None":
 			cut_text = f"[I am really {emotion.lower()},] {cut_text}"
 
 		progress.msg_prefix = f'[{str(line+1)}/{str(len(texts))}]'
@@ -464,14 +464,21 @@ def update_baseline_for_latents_chunks( voice ):
 		return 1
 
 	files = os.listdir(path)
+	
+	total = 0
 	total_duration = 0
+
 	for file in files:
 		if file[-4:] != ".wav":
 			continue
+
 		metadata = torchaudio.info(f'{path}/{file}')
 		duration = metadata.num_channels * metadata.num_frames / metadata.sample_rate
 		total_duration += duration
+		total = total + 1
 
+	if args.autocalculate_voice_chunk_duration_size == 0:
+		return int(total_duration / total) if total > 0 else 1
 	return int(total_duration / args.autocalculate_voice_chunk_duration_size) if total_duration > 0 else 1
 
 def compute_latents(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
@@ -549,6 +556,8 @@ class TrainingState():
 
 		self.eta = "?"
 		self.eta_hhmmss = "?"
+
+		self.nan_detected = False
 
 		self.last_info_check_at = 0
 		self.statistics = []
@@ -701,13 +710,10 @@ class TrainingState():
 				info_line = line.split("INFO:")[-1]
 				# to-do, actually validate this works, and probably kill training when it's found, the model's dead by this point
 				if ': nan' in info_line:
-					should_return = True
-
-					print("! NAN DETECTED !")
-					self.buffer.append("! NAN DETECTED !")
+					self.nan_detected = True
 
 				# easily rip out our stats...
-				match = re.findall(r'\b([a-z_0-9]+?)\b: +?([0-9]\.[0-9]+?e[+-]\d+|[\d,]+)\b', info_line)
+				match = re.findall(r'\b([a-z_0-9]+?)\b: *?([0-9]\.[0-9]+?e[+-]\d+|[\d,]+)\b', info_line)
 				if match and len(match) > 0:
 					for k, v in match:
 						self.info[k] = float(v.replace(",", ""))
@@ -862,6 +868,8 @@ class TrainingState():
 			self.metrics['loss'] = ", ".join(self.metrics['loss'])
 
 			message = f"[{self.metrics['step']}] [{self.metrics['rate']}] [ETA: {eta_hhmmss}]\n[{self.metrics['loss']}]"
+			if self.nan_detected:
+				message = f"[!NaN DETECTED!] {message}"
 
 			if message:
 				percent = self.it / float(self.its) # self.epoch / float(self.epochs)
@@ -965,7 +973,6 @@ def stop_training():
 	try:
 		children = [p.info for p in psutil.process_iter(attrs=['pid', 'name', 'cmdline']) if './src/train.py' in p.info['cmdline']]
 	except Exception as e:
-		print(e)
 		pass
 
 	training_state.process.stdout.close()
@@ -1419,7 +1426,7 @@ def setup_args():
 		'prune-nonfinal-outputs': True,
 		'use-bigvgan-vocoder': True,
 		'concurrency-count': 2,
-		'autocalculate-voice-chunk-duration-size': 10,
+		'autocalculate-voice-chunk-duration-size': 0,
 		'output-sample-rate': 44100,
 		'output-volume': 1,
 		

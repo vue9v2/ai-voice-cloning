@@ -180,9 +180,9 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 
 	return (
 		gr.update(value=j, visible=j is not None),
-		gr.update(visible=j is not None),
 		gr.update(value=latents, visible=latents is not None),
-		None if j is None else j['voice']
+		None if j is None else j['voice'],
+		gr.update(visible=j is not None),
 	)
 
 def prepare_dataset_proxy( voice, language, progress=gr.Progress(track_tqdm=True) ):
@@ -378,15 +378,15 @@ def setup_gradio():
 		with gr.Tab("Generate"):
 			with gr.Row():
 				with gr.Column():
-					text = gr.Textbox(lines=4, label="Prompt")
+					text = gr.Textbox(lines=4, label="Input Prompt")
 			with gr.Row():
 				with gr.Column():
 					delimiter = gr.Textbox(lines=1, label="Line Delimiter", placeholder="\\n")
 
-					emotion = gr.Radio( ["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom"], value="Custom", label="Emotion", type="value", interactive=True )
-					prompt = gr.Textbox(lines=1, label="Custom Emotion + Prompt (if selected)")
+					emotion = gr.Radio( ["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom", "None"], value="None", label="Emotion", type="value", interactive=True )
+					prompt = gr.Textbox(lines=1, label="Custom Emotion")
 					voice = gr.Dropdown(choices=voice_list_with_defaults, label="Voice", type="value", value=voice_list_with_defaults[0]) # it'd be very cash money if gradio was able to default to the first value in the list without this shit
-					mic_audio = gr.Audio( label="Microphone Source", source="microphone", type="filepath" )
+					mic_audio = gr.Audio( label="Microphone Source", source="microphone", type="filepath", visible=False )
 					voice_latents_chunks = gr.Slider(label="Voice Chunks", minimum=1, maximum=128, value=1, step=1)
 					with gr.Row():
 						refresh_voices = gr.Button(value="Refresh Voice List")
@@ -397,6 +397,11 @@ def setup_gradio():
 						inputs=voice,
 						outputs=voice_latents_chunks
 					)
+					voice.change(
+						fn=lambda value: gr.update(visible=value == "microphone"),
+						inputs=voice,
+						outputs=mic_audio,
+					)
 				with gr.Column():
 					candidates = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates")
 					seed = gr.Number(value=0, precision=0, label="Seed")
@@ -406,16 +411,17 @@ def setup_gradio():
 					diffusion_iterations = gr.Slider(value=128, minimum=0, maximum=512, step=1, label="Iterations")
 
 					temperature = gr.Slider(value=0.2, minimum=0, maximum=1, step=0.1, label="Temperature")
-					breathing_room = gr.Slider(value=8, minimum=1, maximum=32, step=1, label="Pause Size")
-					diffusion_sampler = gr.Radio(
-						["P", "DDIM"], # + ["K_Euler_A", "DPM++2M"],
-						value="P", label="Diffusion Samplers", type="value" )
 					show_experimental_settings = gr.Checkbox(label="Show Experimental Settings")
 					reset_generation_settings_button = gr.Button(value="Reset to Default")
 				with gr.Column(visible=False) as col:
 					experimental_column = col
 
 					experimental_checkboxes = gr.CheckboxGroup(["Half Precision", "Conditioning-Free"], value=["Conditioning-Free"], label="Experimental Flags")
+					breathing_room = gr.Slider(value=8, minimum=1, maximum=32, step=1, label="Pause Size")
+					diffusion_sampler = gr.Radio(
+						["P", "DDIM"], # + ["K_Euler_A", "DPM++2M"],
+						value="DDIM", label="Diffusion Samplers", type="value"
+					)
 					cvvp_weight = gr.Slider(value=0, minimum=0, maximum=1, label="CVVP Weight")
 					top_p = gr.Slider(value=0.8, minimum=0, maximum=1, label="Top P")
 					diffusion_temperature = gr.Slider(value=1.0, minimum=0, maximum=1, label="Diffusion Temperature")
@@ -460,10 +466,12 @@ def setup_gradio():
 					audio_in = gr.Files(type="file", label="Audio Input", file_types=["audio"])
 					import_voice_name = gr.Textbox(label="Voice Name")
 					import_voice_button = gr.Button(value="Import Voice")
-				with gr.Column():
-					metadata_out = gr.JSON(label="Audio Metadata", visible=False)
-					copy_button = gr.Button(value="Copy Settings", visible=False)
-					latents_out = gr.File(type="binary", label="Voice Latents", visible=False)
+				with gr.Column(visible=False) as col:
+					utilities_metadata_column = col
+
+					metadata_out = gr.JSON(label="Audio Metadata")
+					copy_button = gr.Button(value="Copy Settings")
+					latents_out = gr.File(type="binary", label="Voice Latents")
 		with gr.Tab("Training"):
 			with gr.Tab("Prepare Dataset"):
 				with gr.Row():
@@ -662,9 +670,9 @@ def setup_gradio():
 			inputs=audio_in,
 			outputs=[
 				metadata_out,
-				copy_button,
 				latents_out,
-				import_voice_name
+				import_voice_name,
+				utilities_metadata_column,
 			]
 		)
 
@@ -697,9 +705,10 @@ def setup_gradio():
 			outputs=voice,
 		)
 		
-		prompt.change(fn=lambda value: gr.update(value="Custom"),
-			inputs=prompt,
-			outputs=emotion
+		emotion.change(
+			fn=lambda value: gr.update(visible=value == "Custom"),
+			inputs=emotion,
+			outputs=prompt
 		)
 		mic_audio.change(fn=lambda value: gr.update(value="microphone"),
 			inputs=mic_audio,
