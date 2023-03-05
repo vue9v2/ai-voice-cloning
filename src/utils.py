@@ -941,6 +941,9 @@ def whisper_transcribe( file, language=None ):
 		load_whisper_model(language=language)
 
 	if not args.whisper_cpp:
+		if not language:
+			language = None
+			
 		return whisper_model.transcribe(file, language=language)
 
 	res = whisper_model.transcribe(file)
@@ -998,12 +1001,13 @@ def prepare_dataset( files, outdir, language=None, progress=None ):
 	with open(f'{outdir}/whisper.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(results, indent='\t'))
 	
+	joined = '\n'.join(transcription)
 	with open(f'{outdir}/train.txt', 'w', encoding="utf-8") as f:
-		f.write("\n".join(transcription))
+		f.write(joined)
 
 	unload_whisper()
 
-	return f"Processed dataset to: {outdir}"
+	return f"Processed dataset to: {outdir}\n{joined}"
 
 def calc_iterations( epochs, lines, batch_size ):
 	iterations = int(epochs * lines / float(batch_size))
