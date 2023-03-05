@@ -799,7 +799,7 @@ class TrainingState():
 			
 			self.metrics['loss'] = []
 			if len(self.losses) > 0:
-				self.metrics['loss'].append(f'Loss: {"{:3f}".format(self.losses[-1]["value"])}')
+				self.metrics['loss'].append(f'Loss: {"{:.3f}".format(self.losses[-1]["value"])}')
 
 			if len(self.losses) >= 2:
 				# i can probably do a """riemann sum""" to get a better derivative, but the instantaneous one works fine
@@ -812,7 +812,7 @@ class TrainingState():
 				dstep = d2_step - d1_step
 
 				# don't bother if the loss went up
-				if dloss < 0:
+				if True; # dloss < 0:
 					its_remain = self.its - self.it
 					inst_deriv = dloss / dstep
 
@@ -828,7 +828,7 @@ class TrainingState():
 						self.metrics['loss'].append(f'Est. milestone {next_milestone} in: {int(est_its)}its')
 					else:
 						est_loss = inst_deriv * its_remain + d1_loss
-						self.metrics['loss'].append(f'Est. final loss: {"{:3f}".format(est_loss)}')
+						self.metrics['loss'].append(f'Est. final loss: {"{:.3f}".format(est_loss)}')
 
 			self.metrics['loss'] = ", ".join(self.metrics['loss'])
 
@@ -1289,7 +1289,7 @@ def get_training_list(dir="./training/"):
 def do_gc():
 	gc.collect()
 	try:
-		trytorch.cuda.empty_cache()
+		torch.cuda.empty_cache()
 	except Exception as e:
 		pass
 
