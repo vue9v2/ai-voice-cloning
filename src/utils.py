@@ -812,7 +812,7 @@ class TrainingState():
 				dstep = d2_step - d1_step
 
 				# don't bother if the loss went up
-				if True; # dloss < 0:
+				if True: # dloss < 0:
 					its_remain = self.its - self.it
 					inst_deriv = dloss / dstep
 
