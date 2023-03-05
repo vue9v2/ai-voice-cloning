@@ -760,9 +760,9 @@ class TrainingState():
 
 					self.metrics['step'] = [f"{self.epoch}/{self.epochs}"]
 					if self.epochs != self.its:
-						self.metric.append(f"{self.it}/{self.its}")
+						self.metrics.append(f"{self.it}/{self.its}")
 					if steps > 1:
-						self.metric.append(f"{step}/{steps}")
+						self.metrics.append(f"{step}/{steps}")
 					self.metrics['step'] = ", ".join(self.metrics['step'])
 
 			if lapsed:
@@ -818,7 +818,7 @@ class TrainingState():
 				deriv = 0
 				accum_length = len(self.losses)//2 # i *guess* this is fine when you think about it
 				loss_value = self.losses[-1]["value"]
-				
+
 				for i in range(accum_length):
 					d1_loss = self.losses[accum_length-i-1]["value"]
 					d2_loss = self.losses[accum_length-i-2]["value"]
