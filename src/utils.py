@@ -752,7 +752,7 @@ class TrainingState():
 					self.it_taken = self.it_taken + 1
 					if self.it_time_delta:
 						try:
-							rate = f'{"{:.3f}".format(self.it_time_delta)}s/it' if self.it_time_delta >= 1 else f'{"{:.3f}".format(1/self.it_time_delta)}it/s'
+							rate = f'{"{:.3f}".format(self.it_time_delta)}s/it' if self.it_time_delta >= 1 or self.it_time_delta == 0 else f'{"{:.3f}".format(1/self.it_time_delta)}it/s'
 							self.it_rate = rate
 						except Exception as e:
 							pass
@@ -767,7 +767,10 @@ class TrainingState():
 				self.epoch_time_end = time.time()
 				self.epoch_time_delta = self.epoch_time_end-self.epoch_time_start
 				self.epoch_time_start = time.time()
-				self.epoch_rate = f'{"{:.3f}".format(self.epoch_time_delta)}s/epoch' if self.epoch_time_delta >= 1 else f'{"{:.3f}".format(1/self.epoch_time_delta)}epoch/s' # I doubt anyone will have it/s rates, but its here
+				try:
+					self.epoch_rate = f'{"{:.3f}".format(self.epoch_time_delta)}s/epoch' if self.epoch_time_delta >= 1 or self.epoch_time_delta == 0 else f'{"{:.3f}".format(1/self.epoch_time_delta)}epoch/s' # I doubt anyone will have it/s rates, but its here
+				except Exception as e:
+					pass
 				
 				#self.eta = (self.epochs - self.epoch) * self.epoch_time_delta
 				self.epoch_time_deltas = self.epoch_time_deltas + self.epoch_time_delta
