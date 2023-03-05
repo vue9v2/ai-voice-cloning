@@ -760,9 +760,9 @@ class TrainingState():
 
 					self.metrics['step'] = [f"{self.epoch}/{self.epochs}"]
 					if self.epochs != self.its:
-						self.metrics.append(f"{self.it}/{self.its}")
+						self.metrics['step'].append(f"{self.it}/{self.its}")
 					if steps > 1:
-						self.metrics.append(f"{step}/{steps}")
+						self.metrics['step'].append(f"{step}/{steps}")
 					self.metrics['step'] = ", ".join(self.metrics['step'])
 
 			if lapsed:
@@ -808,7 +808,7 @@ class TrainingState():
 			self.metrics['loss'] = []
 
 			if 'learning_rate_gpt_0' in self.info:
-				self.metrics['loss'].append(f'LR: {"{:e}".format(self.info["learning_rate_gpt_0"])}')
+				self.metrics['loss'].append(f'LR: {"{:.3e}".format(self.info["learning_rate_gpt_0"])}')
 
 			if len(self.losses) > 0:
 				self.metrics['loss'].append(f'Loss: {"{:.3f}".format(self.losses[-1]["value"])}')
