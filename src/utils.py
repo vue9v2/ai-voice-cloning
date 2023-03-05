@@ -808,7 +808,7 @@ class TrainingState():
 			self.metrics['loss'] = []
 
 			if 'learning_rate_gpt_0' in self.info:
-				self.metrics['loss'].append(f'LR: {"{:.9f}".format(self.info["learning_rate_gpt_0"])}')
+				self.metrics['loss'].append(f'LR: {"{:e}".format(self.info["learning_rate_gpt_0"])}')
 
 			if len(self.losses) > 0:
 				self.metrics['loss'].append(f'Loss: {"{:.3f}".format(self.losses[-1]["value"])}')
