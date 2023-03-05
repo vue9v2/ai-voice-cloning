@@ -836,7 +836,6 @@ class TrainingState():
 					if next_milestone:
 						# tfw can do simple calculus but not basic algebra in my head
 						est_its = (next_milestone - d1_loss) / deriv
-						print("Estimated iteration to next milestone", est_its)
 						if est_its >= 0:
 							self.metrics['loss'].append(f'Est. milestone {next_milestone} in: {int(est_its)}its')
 					else:
