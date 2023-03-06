@@ -1,4 +1,6 @@
 git+https://github.com/openai/whisper.git
+git+https://github.com/m-bain/whisperx.git
+
 more-itertools
 ffmpeg-python
 gradio

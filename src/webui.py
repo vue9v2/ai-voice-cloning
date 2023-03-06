@@ -589,10 +589,10 @@ def setup_gradio():
 					
 					autoregressive_model_dropdown = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
 					
+					whisper_backend = gr.Dropdown(WHISPER_BACKENDS, label="Whisper Backends", value=args.whisper_backend)
 					whisper_model_dropdown = gr.Dropdown(WHISPER_MODELS, label="Whisper Model", value=args.whisper_model)
-					use_whisper_cpp = gr.Checkbox(label="Use Whisper.cpp", value=args.whisper_cpp)
 					
-					exec_inputs = exec_inputs + [ autoregressive_model_dropdown, whisper_model_dropdown, use_whisper_cpp, training_halfp, training_bnb ]
+					exec_inputs = exec_inputs + [ autoregressive_model_dropdown, whisper_backend, whisper_model_dropdown, training_halfp, training_bnb ]
 
 					with gr.Row():
 						autoregressive_models_update_button = gr.Button(value="Refresh Model List")
@@ -732,6 +732,7 @@ def setup_gradio():
 		submit_event = submit.click(run_generation,
 			inputs=input_settings,
 			outputs=[output_audio, source_sample, candidates_list, generation_results],
+			api_name="generate",
 		)
 
 
