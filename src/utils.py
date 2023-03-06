@@ -1035,6 +1035,12 @@ def whisper_transcribe( file, language=None ):
 		model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
 		result_aligned = whisperx.align(result["segments"], model_a, metadata, file, device)
 
+		for i in range(len(result_aligned['segments'])):
+			del result_aligned['segments'][i]['word-segments']
+			del result_aligned['segments'][i]['char-segments']
+
+		result['segments'] = result_aligned['segments']
+
 		return result
 
 def prepare_dataset( files, outdir, language=None, skip_existings=False, progress=None ):
