@@ -1037,7 +1037,7 @@ def whisper_transcribe( file, language=None ):
 
 		return result
 
-def prepare_dataset( files, outdir, language=None, progress=None ):
+def prepare_dataset( files, outdir, language=None, skip_existings=False, progress=None ):
 	unload_tts()
 
 	global whisper_model
@@ -1049,8 +1049,28 @@ def prepare_dataset( files, outdir, language=None, progress=None ):
 	results = {}
 	transcription = []
 
+	previous_list = []
+	if skip_existings and os.path.exists(f'{outdir}/train.txt'):
+		parsed_list = []
+		with open(f'{outdir}/train.txt', 'r', encoding="utf-8") as f:
+			parsed_list = f.readlines()
+
+		for line in parsed_list:
+			match = re.findall(r"^(.+?)_\d+\.wav$", line.split("|")[0])
+			print(match)
+			if match is None or len(match) == 0:
+				continue
+			
+			if match[0] not in previous_list:
+				previous_list.append(f'{match[0]}.wav')
+
 	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
 		basename = os.path.basename(file)
+
+		if basename in previous_list:
+			print(f"Skipping already parsed file: {basename}")
+			continue
+
 		result = whisper_transcribe(file, language=language)
 		results[basename] = result
 		print(f"Transcribed file: {file}, {len(result['segments'])} found.")

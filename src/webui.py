@@ -185,8 +185,8 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 		gr.update(visible=j is not None),
 	)
 
-def prepare_dataset_proxy( voice, language, progress=gr.Progress(track_tqdm=True) ):
-	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, progress=progress )
+def prepare_dataset_proxy( voice, language, skip_existings, progress=gr.Progress(track_tqdm=True) ):
+	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, progress=progress )
 
 def optimize_training_settings_proxy( *args, **kwargs ):
 	tup = optimize_training_settings(*args, **kwargs)
@@ -478,7 +478,8 @@ def setup_gradio():
 					with gr.Column():
 						dataset_settings = [
 							gr.Dropdown( choices=voice_list, label="Dataset Source", type="value", value=voice_list[0] if len(voice_list) > 0 else "" ),
-							gr.Textbox(label="Language", value="en")
+							gr.Textbox(label="Language", value="en"),
+							gr.Checkbox(label="Skip Already Transcribed", value=False)
 						]
 						prepare_dataset_button = gr.Button(value="Prepare")
 					with gr.Column():
