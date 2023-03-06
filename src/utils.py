@@ -1057,8 +1057,8 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, progres
 	files = sorted(files)
 
 	previous_list = []
+	parsed_list = []
 	if skip_existings and os.path.exists(f'{outdir}/train.txt'):
-		parsed_list = []
 		with open(f'{outdir}/train.txt', 'r', encoding="utf-8") as f:
 			parsed_list = f.readlines()
 
@@ -1109,6 +1109,9 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, progres
 	
 	with open(f'{outdir}/whisper.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(results, indent='\t'))
+
+	if len(parsed_list) > 0:
+		transcription = parsed_list + transcription
 	
 	joined = '\n'.join(transcription)
 	with open(f'{outdir}/train.txt', 'w', encoding="utf-8") as f:
