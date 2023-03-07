@@ -300,7 +300,7 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
 	validation_name = f"{voice}-val"
-	validation_path = f"./training/{voice}/train.txt"
+	validation_path = f"./training/{voice}/validation.txt"
 
 	with open(dataset_path, 'r', encoding="utf-8") as f:
 		lines = len(f.readlines())
@@ -312,6 +312,16 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 
 	print_rate = int(print_rate * iterations / epochs)
 	save_rate = int(save_rate * iterations / epochs)
+	validation_rate = save_rate
+
+	if iterations % save_rate != 0:
+		adjustment = int(iterations / save_rate) * save_rate
+		messages.append(f"Iteration rate is not evenly divisible by save rate, adjusting: {iterations} => {adjustment}")
+		iterations = adjustment
+
+	if not os.path.exists(validation_path):
+		validation_rate = iterations
+		validation_path = dataset_path
 
 	if not learning_rate_schedule:
 		learning_rate_schedule = EPOCH_SCHEDULE
@@ -329,6 +339,7 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 		gradient_accumulation_size=gradient_accumulation_size,
 		print_rate=print_rate,
 		save_rate=save_rate,
+		validation_rate=validation_rate,
 		name=name,
 		dataset_name=dataset_name,
 		dataset_path=dataset_path,
@@ -559,7 +570,7 @@ def setup_gradio():
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
 						
 						with gr.Row():
-							training_keep_x_past_checkpoints = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
+							training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
 							training_gpu_count = gr.Number(label="GPUs", value=get_device_count())
 						with gr.Row():
 							start_training_button = gr.Button(value="Train")
@@ -777,7 +788,7 @@ def setup_gradio():
 				training_configs,
 				verbose_training,
 				training_gpu_count,
-				training_keep_x_past_checkpoints,
+				training_keep_x_past_datasets,
 			],
 			outputs=[
 				training_output,

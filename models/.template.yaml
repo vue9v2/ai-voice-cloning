@@ -122,7 +122,7 @@ train:
   niter: ${iterations}
   warmup_iter: -1
   mega_batch_factor: ${gradient_accumulation_size}
-  val_freq: ${iterations}
+  val_freq: ${validation_rate}
 
   ema_enabled: false # I really don't think EMA matters
 

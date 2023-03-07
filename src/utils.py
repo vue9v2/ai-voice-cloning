@@ -1228,10 +1228,7 @@ def schedule_learning_rate( iterations, schedule=EPOCH_SCHEDULE ):
 
 def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, resume_path, half_p, bnb, workers, source_model, voice ):
 	name = f"{voice}-finetune"
-	dataset_name = f"{voice}-train"
 	dataset_path = f"./training/{voice}/train.txt"
-	validation_name = f"{voice}-val"
-	validation_path = f"./training/{voice}/train.txt"
 
 	with open(dataset_path, 'r', encoding="utf-8") as f:
 		lines = len(f.readlines())
@@ -1303,7 +1300,7 @@ def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learni
 		messages
 	)
 
-def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weight=None, learning_rate_schedule=None, batch_size=None, gradient_accumulation_size=None, print_rate=None, save_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None, bnb=None, workers=None, source_model=None ):
+def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weight=None, learning_rate_schedule=None, batch_size=None, gradient_accumulation_size=None, print_rate=None, save_rate=None, validation_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, output_name=None, resume_path=None, half_p=None, bnb=None, workers=None, source_model=None ):
 	if not source_model:
 		source_model = f"./models/tortoise/autoregressive{'_half' if half_p else ''}.pth"
 
@@ -1320,6 +1317,7 @@ def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weig
 		"dataset_path": dataset_path if dataset_path else "./training/finetune/train.txt",
 		"validation_name": validation_name if validation_name else "finetune",
 		"validation_path": validation_path if validation_path else "./training/finetune/train.txt",
+		'validation_rate': validation_rate if validation_rate else iterations,
 
 		"text_ce_lr_weight": text_ce_lr_weight if text_ce_lr_weight else 0.01,
 
