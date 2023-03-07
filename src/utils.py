@@ -103,8 +103,12 @@ def generate(
 	if seed == 0:
 		seed = None
 
+	voice_cache = {}
 	def fetch_voice( voice ):
-		print(f"Loading voice: {voice}")
+		print(f"Loading voice: {voice} with model {tts.autoregressive_model_hash[:8]}")
+		cache_key = f'{voice}:{tts.autoregressive_model_hash[:8]}'
+		if cache_key in voice_cache:
+			return voice_cache[cache_key]
 
 		sample_voice = None
 		if voice == "microphone":
@@ -126,7 +130,8 @@ def generate(
 			sample_voice = torch.cat(voice_samples, dim=-1).squeeze().cpu()
 			voice_samples = None
 
-		return (voice_samples, conditioning_latents, sample_voice)
+		voice_cache[cache_key] = (voice_samples, conditioning_latents, sample_voice)
+		return voice_cache[cache_key]
 
 	def get_settings( override=None ):
 		settings = {
@@ -1479,12 +1484,19 @@ def curl(url):
 		print(e)
 		return None
 
-def check_for_updates():
-	if not os.path.isfile('./.git/FETCH_HEAD'):
+def check_for_updates( dir = None ):
+	if dir is None:
+		check_for_updates("./")
+		check_for_updates("./dlas/")
+		check_for_updates("./tortoise-tts/")
+		return
+
+	git_dir = f'{dir}/.git/'
+	if not os.path.isfile(f'{git_dir}/FETCH_HEAD'):
 		print("Cannot check for updates: not from a git repo")
 		return False
 
-	with open(f'./.git/FETCH_HEAD', 'r', encoding="utf-8") as f:
+	with open(f'{git_dir}/FETCH_HEAD', 'r', encoding="utf-8") as f:
 		head = f.read()
 	
 	match = re.findall(r"^([a-f0-9]+).+?https:\/\/(.+?)\/(.+?)\/(.+?)\n", head)
