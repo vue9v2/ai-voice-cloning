@@ -1200,6 +1200,7 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, progres
 
 	unload_whisper()
 
+	joined = "\n".join(transcription)
 	return f"Processed dataset to: {outdir}\n{joined}"
 
 def calc_iterations( epochs, lines, batch_size ):
