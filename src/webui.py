@@ -577,7 +577,6 @@ def setup_gradio():
 						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
 						gr.Checkbox(label="Do Not Load TTS On Startup", value=args.defer_tts_load),
 						gr.Checkbox(label="Delete Non-Final Output", value=args.prune_nonfinal_outputs),
-						gr.Checkbox(label="Use BigVGAN Vocoder", value=args.use_bigvgan_vocoder),
 						gr.Textbox(label="Device Override", value=args.device_override),
 					]
 				with gr.Column():
@@ -590,10 +589,11 @@ def setup_gradio():
 					
 					autoregressive_model_dropdown = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
 					
+					vocoder_models = gr.Dropdown(VOCODERS, label="Vocoder", value=args.vocoder_model if args.vocoder_model else VOCODERS[-1])
 					whisper_backend = gr.Dropdown(WHISPER_BACKENDS, label="Whisper Backends", value=args.whisper_backend)
 					whisper_model_dropdown = gr.Dropdown(WHISPER_MODELS, label="Whisper Model", value=args.whisper_model)
 					
-					exec_inputs = exec_inputs + [ autoregressive_model_dropdown, whisper_backend, whisper_model_dropdown, training_halfp, training_bnb ]
+					exec_inputs = exec_inputs + [ autoregressive_model_dropdown, vocoder_models, whisper_backend, whisper_model_dropdown, training_halfp, training_bnb ]
 
 					with gr.Row():
 						autoregressive_models_update_button = gr.Button(value="Refresh Model List")
@@ -623,6 +623,12 @@ def setup_gradio():
 				autoregressive_model_dropdown.change(
 					fn=update_autoregressive_model,
 					inputs=autoregressive_model_dropdown,
+					outputs=None
+				)
+
+				vocoder_models.change(
+					fn=update_vocoder_model,
+					inputs=vocoder_models,
 					outputs=None
 				)
 
