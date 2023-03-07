@@ -42,7 +42,7 @@ WHISPER_MODELS = ["tiny", "base", "small", "medium", "large", "large-v2"]
 WHISPER_SPECIALIZED_MODELS = ["tiny.en", "base.en", "small.en", "medium.en"]
 WHISPER_BACKENDS = ["openai/whisper", "lightmare/whispercpp", "m-bain/whisperx"]
 
-VOCODERS = ['univnet', 'bigvgan_base_24khz_100band'] #, 'bigvgan_24khz_100band']
+VOCODERS = ['univnet', 'bigvgan_base_24khz_100band', 'bigvgan_24khz_100band']
 
 EPOCH_SCHEDULE = [ 9, 18, 25, 33 ]
 
@@ -184,7 +184,7 @@ def generate(
 			settings['sample_batch_size'] = num_autoregressive_samples
 
 		if settings['conditioning_latents'] is not None and len(settings['conditioning_latents']) == 2 and settings['cvvp_amount'] > 0:
-			print("Requesting weighing against CVVP weight, but voice latents are missing some extra data. Please regenerate your voice latents.")
+			print("Requesting weighing against CVVP weight, but voice latents are missing some extra data. Please regenerate your voice latents with 'Slimmer voice latents' unchecked.")
 			settings['cvvp_amount'] = 0
 			
 		return settings
@@ -317,7 +317,7 @@ def generate(
 		if emotion == "Custom":
 			if prompt and prompt.strip() != "":
 				cut_text = f"[{prompt},] {cut_text}"
-		elif emotion != "None":
+		elif emotion != "None" and emotion:
 			cut_text = f"[I am really {emotion.lower()},] {cut_text}"
 		
 		progress.msg_prefix = f'[{str(line+1)}/{str(len(texts))}]'
