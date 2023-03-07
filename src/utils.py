@@ -985,6 +985,9 @@ def run_training(config_path, verbose=False, gpus=1, keep_x_past_datasets=0, pro
 	global training_state
 	if training_state and training_state.process:
 		return "Training already in progress"
+
+	# ensure we have the dvae.pth
+	get_model_path('dvae.pth')
 	
 	# I don't know if this is still necessary, as it was bitching at me for not doing this, despite it being in a separate process
 	torch.multiprocessing.freeze_support()
