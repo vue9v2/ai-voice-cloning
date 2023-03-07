@@ -1201,6 +1201,10 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, progres
 	unload_whisper()
 
 	joined = "\n".join(transcription)
+	if not skip_existings:
+		with open(f'{outdir}/train.txt', 'w', encoding="utf-8") as f:
+			f.write(joined)
+
 	return f"Processed dataset to: {outdir}\n{joined}"
 
 def calc_iterations( epochs, lines, batch_size ):
