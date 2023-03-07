@@ -1493,14 +1493,14 @@ def curl(url):
 
 def check_for_updates( dir = None ):
 	if dir is None:
-		check_for_updates("./")
-		check_for_updates("./dlas/")
-		check_for_updates("./tortoise-tts/")
+		check_for_updates("./.git/")
+		check_for_updates("./.git/modules/dlas/")
+		check_for_updates("./.git/modules/tortoise-tts/")
 		return
 
-	git_dir = f'{dir}/.git/'
+	git_dir = dir
 	if not os.path.isfile(f'{git_dir}/FETCH_HEAD'):
-		print("Cannot check for updates: not from a git repo")
+		print(f"Cannot check for updates for {dir}: not from a git repo")
 		return False
 
 	with open(f'{git_dir}/FETCH_HEAD', 'r', encoding="utf-8") as f:
@@ -1508,7 +1508,7 @@ def check_for_updates( dir = None ):
 	
 	match = re.findall(r"^([a-f0-9]+).+?https:\/\/(.+?)\/(.+?)\/(.+?)\n", head)
 	if match is None or len(match) == 0:
-		print("Cannot check for updates: cannot parse FETCH_HEAD")
+		print(f"Cannot check for updates for {dir}: cannot parse FETCH_HEAD")
 		return False
 
 	match = match[0]
@@ -1521,13 +1521,13 @@ def check_for_updates( dir = None ):
 	res = curl(f"https://{host}/api/v1/repos/{owner}/{repo}/branches/") #this only works for gitea instances
 
 	if res is None or len(res) == 0:
-		print("Cannot check for updates: cannot fetch from remote")
+		print(f"Cannot check for updates for {dir}: cannot fetch from remote")
 		return False
 
 	remote = res[0]["commit"]["id"]
 
 	if remote != local:
-		print(f"New version found: {local[:8]} => {remote[:8]}")
+		print(f"New version found for {dir}: {local[:8]} => {remote[:8]}")
 		return True
 
 	return False
