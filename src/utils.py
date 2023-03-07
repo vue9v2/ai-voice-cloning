@@ -991,6 +991,13 @@ def run_training(config_path, verbose=False, gpus=1, keep_x_past_datasets=0, pro
 	if training_state and training_state.process:
 		return "Training already in progress"
 
+	try:
+		import altair as alt
+		alt.data_transformers.enable('default', max_rows=None)
+	except Exception as e:
+		print(e)
+		pass
+
 	# ensure we have the dvae.pth
 	get_model_path('dvae.pth')
 	
@@ -1043,7 +1050,7 @@ def reconnect_training(verbose=False, progress=gr.Progress(track_tqdm=True)):
 		return "Training not in progress"
 
 	for line in iter(training_state.process.stdout.readline, ""):
-		result, percent, message = training_state.parse( line=line, verbose=verbose, keep_x_past_datasets=keep_x_past_datasets, progress=progress )
+		result, percent, message = training_state.parse( line=line, verbose=verbose, progress=progress )
 		print(f"[Training] [{datetime.now().isoformat()}] {line[:-1]}")
 		if result:
 			yield result
