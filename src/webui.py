@@ -163,6 +163,11 @@ def history_view_results( voice ):
 		gr.Dropdown.update(choices=sorted(files))
 	)
 
+def compute_latents_proxy(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
+	compute_latents( voice=voice, voice_latents_chunks=voice_latents_chunks, progress=progress )
+	return voice
+
+
 def import_voices_proxy(files, name, progress=gr.Progress(track_tqdm=True)):
 	import_voices(files, name, progress)
 	return gr.update()
@@ -387,7 +392,7 @@ def setup_gradio():
 					prompt = gr.Textbox(lines=1, label="Custom Emotion")
 					voice = gr.Dropdown(choices=voice_list_with_defaults, label="Voice", type="value", value=voice_list_with_defaults[0]) # it'd be very cash money if gradio was able to default to the first value in the list without this shit
 					mic_audio = gr.Audio( label="Microphone Source", source="microphone", type="filepath", visible=False )
-					voice_latents_chunks = gr.Slider(label="Voice Chunks", minimum=1, maximum=128, value=1, step=1)
+					voice_latents_chunks = gr.Number(label="Voice Chunks", precision=0, value=0)
 					with gr.Row():
 						refresh_voices = gr.Button(value="Refresh Voice List")
 						recompute_voice_latents = gr.Button(value="(Re)Compute Voice Latents")
@@ -704,7 +709,7 @@ def setup_gradio():
 			],
 		)
 
-		recompute_voice_latents.click(compute_latents,
+		recompute_voice_latents.click(compute_latents_proxy,
 			inputs=[
 				voice,
 				voice_latents_chunks,
