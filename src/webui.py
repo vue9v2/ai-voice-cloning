@@ -559,7 +559,7 @@ def setup_gradio():
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
 						
 						with gr.Row():
-							training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
+							training_keep_x_past_checkpoints = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
 							training_gpu_count = gr.Number(label="GPUs", value=get_device_count())
 						with gr.Row():
 							start_training_button = gr.Button(value="Train")
@@ -777,7 +777,7 @@ def setup_gradio():
 				training_configs,
 				verbose_training,
 				training_gpu_count,
-				training_keep_x_past_datasets,
+				training_keep_x_past_checkpoints,
 			],
 			outputs=[
 				training_output,
