@@ -28,8 +28,8 @@ datasets:
     load_aligned_codes: False
   val: # I really do not care about validation right now
     name: ${validation_name}
-    n_workers: 1
-    batch_size: 1
+    n_workers: ${workers}
+    batch_size: ${batch_size}
     mode: paired_voice_audio
     path: ${validation_path}
     fetcher_mode: ['lj']
@@ -131,13 +131,8 @@ train:
   lr_gamma: 0.5
 
 eval:
+  pure: True
   output_state: gen
-  injectors:
-    gen_inj_eval:
-      type: generator
-      generator: generator
-      in: hq
-      out: [gen, codebook_commitment_loss]
 
 logger: 
   print_freq: ${print_rate}

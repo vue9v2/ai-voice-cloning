@@ -684,7 +684,7 @@ class TrainingState():
 		except Exception as e:
 			use_tensorboard = False
 
-		keys = ['loss_text_ce', 'loss_mel_ce', 'loss_gpt_total']
+		keys = ['loss_text_ce', 'loss_mel_ce', 'loss_gpt_total', 'val_loss_text_ce', 'val_loss_mel_ce']
 		infos = {}
 		highest_step = self.last_info_check_at
 
@@ -1220,6 +1220,44 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, progres
 
 	return f"Processed dataset to: {outdir}\n{joined}"
 
+def prepare_validation_dataset( voice, text_length ):
+	indir = f'./training/{voice}/'
+	infile = f'{indir}/dataset.txt'
+	if not os.path.exists(infile):
+		infile = f'{indir}/train.txt'
+		with open(f'{indir}/train.txt', 'r', encoding="utf-8") as src:
+			with open(f'{indir}/dataset.txt', 'w', encoding="utf-8") as dst:
+				dst.write(src.read())
+
+	if not os.path.exists(infile):
+		raise Exception(f"Missing dataset: {infile}")
+
+	with open(infile, 'r', encoding="utf-8") as f:
+		lines = f.readlines()
+
+	validation = []
+	training = []
+
+	for line in lines:
+		split = line.split("|")
+		filename = split[0]
+		text = split[1]
+
+		if len(text) < text_length:
+			validation.append(line.strip())
+		else:
+			training.append(line.strip())
+
+	with open(f'{indir}/train.txt', 'w', encoding="utf-8") as f:
+		f.write("\n".join(training))
+
+	with open(f'{indir}/validation.txt', 'w', encoding="utf-8") as f:
+		f.write("\n".join(validation))
+
+	msg = f"Culled {len(validation)} lines"
+	print(msg)
+	return msg
+
 def calc_iterations( epochs, lines, batch_size ):
 	iterations = int(epochs * lines / float(batch_size))
 	return iterations
@@ -1227,7 +1265,7 @@ def calc_iterations( epochs, lines, batch_size ):
 def schedule_learning_rate( iterations, schedule=EPOCH_SCHEDULE ):
 	return [int(iterations * d) for d in schedule]
 
-def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, resume_path, half_p, bnb, workers, source_model, voice ):
+def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, validation_rate, resume_path, half_p, bnb, workers, source_model, voice ):
 	name = f"{voice}-finetune"
 	dataset_path = f"./training/{voice}/train.txt"
 
@@ -1271,6 +1309,10 @@ def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learni
 		save_rate = epochs
 		messages.append(f"Save rate is too small for the given iteration step, clamping save rate to: {save_rate}")
 
+	if epochs < validation_rate:
+		validation_rate = epochs
+		messages.append(f"Validation rate is too small for the given iteration step, clamping validation rate to: {validation_rate}")
+
 	if resume_path and not os.path.exists(resume_path):
 		resume_path = None
 		messages.append("Resume path specified, but does not exist. Disabling...")
@@ -1297,6 +1339,7 @@ def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learni
 		gradient_accumulation_size,
 		print_rate,
 		save_rate,
+		validation_rate,
 		resume_path,
 		messages
 	)
