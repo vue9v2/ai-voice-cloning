@@ -318,6 +318,8 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 	save_rate = int(save_rate * iterations / epochs)
 	validation_rate = int(validation_rate * iterations / epochs)
 
+	validation_batch_size = batch_size
+
 	if iterations % save_rate != 0:
 		adjustment = int(iterations / save_rate) * save_rate
 		messages.append(f"Iteration rate is not evenly divisible by save rate, adjusting: {iterations} => {adjustment}")
@@ -326,6 +328,14 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 	if not os.path.exists(validation_path):
 		validation_rate = iterations
 		validation_path = dataset_path
+		messages.append("Validation not found, disabling validation...")
+	else:
+		with open(validation_path, 'r', encoding="utf-8") as f:
+			validation_lines = len(f.readlines())
+
+		if validation_lines < validation_batch_size:
+			validation_batch_size = validation_lines
+			messages.append(f"Batch size exceeds validation dataset size, clamping validation batch size to {validation_lines}")
 
 	if not learning_rate_schedule:
 		learning_rate_schedule = EPOCH_SCHEDULE
@@ -349,6 +359,7 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 		dataset_path=dataset_path,
 		validation_name=validation_name,
 		validation_path=validation_path,
+		validation_batch_size=validation_batch_size,
 		output_name=f"{voice}/train.yaml",
 		resume_path=resume_path,
 		half_p=half_p,
