@@ -126,9 +126,7 @@ train:
 
   ema_enabled: false # I really don't think EMA matters
 
-  default_lr_scheme: MultiStepLR
-  gen_lr_steps: ${gen_lr_steps} #[50000, 100000, 140000, 180000]
-  lr_gamma: 0.5
+  ${learning_rate_scheme}
 
 eval:
   pure: ${validation_enabled}

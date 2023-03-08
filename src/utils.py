@@ -1008,6 +1008,21 @@ def run_training(config_path, verbose=False, gpus=1, keep_x_past_checkpoints=0, 
 	# I don't know if this is still necessary, as it was bitching at me for not doing this, despite it being in a separate process
 	torch.multiprocessing.freeze_support()
 
+	# edit any gpu-count-specific variables
+	with open(config_path, 'r', encoding="utf-8") as f:
+		yaml_string = f.read()
+		edited = False
+		if gpus > 1:
+			yaml_string = yaml_string.replace(" adamw ", " adamw_zero ")
+			edited = True
+		else:
+			yaml_string = yaml_string.replace(" adamw_zero ", " adamw ")
+			edited = True
+	if edited:
+		print(f'Modified YAML config')
+		with open(config_path, 'w', encoding="utf-8") as f:
+			f.write(yaml_string)
+
 	unload_tts()
 	unload_whisper()
 	unload_voicefixer()
@@ -1347,7 +1362,7 @@ def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learni
 		messages
 	)
 
-def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weight=None, learning_rate_schedule=None, batch_size=None, gradient_accumulation_size=None, print_rate=None, save_rate=None, validation_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, validation_batch_size=None, output_name=None, resume_path=None, half_p=None, bnb=None, workers=None, source_model=None ):
+def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weight=None, learning_rate_scheme=None, learning_rate_schedule=None, batch_size=None, gradient_accumulation_size=None, print_rate=None, save_rate=None, validation_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, validation_batch_size=None, output_name=None, resume_path=None, half_p=None, bnb=None, workers=None, source_model=None ):
 	if not source_model:
 		source_model = f"./models/tortoise/autoregressive{'_half' if half_p else ''}.pth"
 
@@ -1355,7 +1370,6 @@ def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weig
 		"iterations": iterations if iterations else 500,
 		"batch_size": batch_size if batch_size else 64,
 		"learning_rate": learning_rate if learning_rate else 1e-5,
-		"gen_lr_steps": learning_rate_schedule if learning_rate_schedule else EPOCH_SCHEDULE,
 		"gradient_accumulation_size": gradient_accumulation_size if gradient_accumulation_size else 4,
 		"print_rate": print_rate if print_rate else 1,
 		"save_rate": save_rate if save_rate else 50,
@@ -1378,6 +1392,22 @@ def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weig
 
 		'workers': workers if workers else 2,
 	}
+
+	LEARNING_RATE_SCHEMES = ["MultiStepLR", "CosineAnnealingLR_Restart"]
+	if learning_rate_scheme not in LEARNING_RATE_SCHEMES:
+		learning_rate_scheme = LEARNING_RATE_SCHEMES[0]
+
+	learning_rate_schema = [f"default_lr_scheme: {learning_rate_scheme}"]
+	if learning_rate_scheme == "MultiStepLR":
+		learning_rate_schema.append(f"  gen_lr_steps: {learning_rate_schedule if learning_rate_schedule else EPOCH_SCHEDULE}")
+		learning_rate_schema.append(f"  lr_gamma: 0.5")
+	elif learning_rate_scheme == "CosineAnnealingLR_Restart":
+		learning_rate_schema.append(f"  T_period: [120000, 120000, 120000]")
+		learning_rate_schema.append(f"  warmup: 10000")
+		learning_rate_schema.append(f"  eta_min: .01")
+		learning_rate_schema.append(f"  restarts: [140000, 280000]")
+		learning_rate_schema.append(f"  restart_weights: [.5, .25]")
+	settings['learning_rate_scheme'] = "\n".join(learning_rate_schema)
 
 	if resume_path:
 		settings['pretrain_model_gpt'] = f"# {settings['pretrain_model_gpt']}"
