@@ -297,14 +297,14 @@ def generate(
 			latents_path = f'{get_voice_dir()}/{voice}/cond_latents.pth'
 
 			if voice == "random" or voice == "microphone":
-				if latents and settings['conditioning_latents']:
+				if latents and settings is not None and settings['conditioning_latents']:
 					dir = f'{get_voice_dir()}/{voice}/'
 					if not os.path.isdir(dir):
 						os.makedirs(dir, exist_ok=True)
 					latents_path = f'{dir}/cond_latents.pth'
 					torch.save(conditioning_latents, latents_path)
 			else:
-				if settings and "model_hash" in settings:
+				if settings is not None and "model_hash" in settings:
 					latents_path = f'{get_voice_dir()}/{voice}/cond_latents_{settings["model_hash"][:8]}.pth'
 				else:
 					latents_path = f'{get_voice_dir()}/{voice}/cond_latents_{tts.autoregressive_model_hash[:8]}.pth'
