@@ -12,23 +12,8 @@ This is not endorsed by [neonbjb](https://github.com/neonbjb/). I do not expect 
 
 ## Documentation
 
-Please consult [the wiki](https://git.ecker.tech/mrq/ai-voice-cloning/wiki) for the documentation, including how to install, prepare voices for, and use the software.
+Please consult [the wiki](https://git.ecker.tech/mrq/ai-voice-cloning/wiki) for the documentation.
 
 ## Bug Reporting
 
-If you run into any problems, please refer to the [issues you may encounter](https://git.ecker.tech/mrq/ai-voice-cloning/wiki/Issues) wiki page first. Please don't hesitate to submit an issue.
-
-## Changelogs
-
-Below will be a rather-loose changelogss, as I don't think I have a way to chronicle them outside of commit messages:
-
-### `2023.02.22`
-
-* greatly reduced VRAM consumption through the use of [TimDettmers/bitsandbytes](https://github.com/TimDettmers/bitsandbytes)
-* cleaned up section of code that handled parsing output from training script
-* added button to reconnect to the training script's output (sometimes skips a line to update, but it's better than nothing)
-* actually update submodules from the update script (somehow forgot to pass `--remote`)
-
-### `Before 2023.02.22`
-
-Refer to commit logs.
+If you run into any problems, please refer to the [issues you may encounter](https://git.ecker.tech/mrq/ai-voice-cloning/wiki/Issues) wiki page first.

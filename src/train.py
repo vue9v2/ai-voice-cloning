@@ -21,8 +21,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.opt = " ".join(args.opt) # absolutely disgusting
 
+
     with open(args.opt, 'r') as file:
         opt_config = yaml.safe_load(file)
+
+    if "WORLD_SIZE" in os.environ:
+        if int(os.environ["WORLD_SIZE"]) > 1 and opt_config["steps"]["gpt_train"]["optimizer"] == "adamw":
+            opt_config["steps"]["gpt_train"]["optimizer"] = "adamw_zero"
 
     if "ext" in opt_config and "bitsandbytes" in opt_config["ext"] and not opt_config["ext"]["bitsandbytes"]:
         os.environ['BITSANDBYTES_OVERRIDE_LINEAR'] = '0'
