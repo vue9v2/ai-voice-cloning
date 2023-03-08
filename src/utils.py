@@ -697,23 +697,22 @@ class TrainingState():
 				logs = [logs[-1]]
 
 			for log in logs:
-				try:
 					ea = event_accumulator.EventAccumulator(log, size_guidance={event_accumulator.SCALARS: 0})
 					ea.Reload()
 
 					for key in keys:
-						scalar = ea.Scalars(key)
-						for s in scalar:
-							if update and s.step <= self.last_info_check_at:
-								continue
-							highest_step = max( highest_step, s.step )
-							self.statistics.append( { "step": s.step, "value": s.value, "type": key } )
+						try:
+							scalar = ea.Scalars(key)
+							for s in scalar:
+								if update and s.step <= self.last_info_check_at:
+									continue
+								highest_step = max( highest_step, s.step )
+								self.statistics.append( { "step": s.step, "value": s.value, "type": key } )
 
-							if key == 'loss_gpt_total':
-								self.losses.append( { "step": s.step, "value": s.value, "type": key } )
-
-				except Exception as e:
-					pass
+								if key == 'loss_gpt_total':
+									self.losses.append( { "step": s.step, "value": s.value, "type": key } )
+						except Exception as e:
+							pass
 
 		else:
 			logs = sorted([f'{self.dataset_dir}/{d}' for d in os.listdir(self.dataset_dir) if d[-4:] == ".log" ])
