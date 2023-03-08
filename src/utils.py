@@ -802,7 +802,7 @@ class TrainingState():
 			if line.find('INFO: [epoch:') >= 0:
 				info_line = line.split("INFO:")[-1]
 				# to-do, actually validate this works, and probably kill training when it's found, the model's dead by this point
-				if ': nan' in info_line and not self.self.nan_detected:
+				if ': nan' in info_line and not self.nan_detected:
 					self.nan_detected = self.it
 
 				# easily rip out our stats...
@@ -986,17 +986,18 @@ class TrainingState():
 			message,
 		)
 
+try:
+	import altair as alt
+	alt.data_transformers.enable('default', max_rows=None)
+except Exception as e:
+	print(e)
+	pass
+
 def run_training(config_path, verbose=False, gpus=1, keep_x_past_checkpoints=0, progress=gr.Progress(track_tqdm=True)):
 	global training_state
 	if training_state and training_state.process:
 		return "Training already in progress"
 
-	try:
-		import altair as alt
-		alt.data_transformers.enable('default', max_rows=None)
-	except Exception as e:
-		print(e)
-		pass
 
 	# ensure we have the dvae.pth
 	get_model_path('dvae.pth')
