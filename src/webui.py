@@ -318,7 +318,7 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 	save_rate = int(save_rate * iterations / epochs)
 	validation_rate = int(validation_rate * iterations / epochs)
 
-	validation_batch_size = batch_size
+	validation_batch_size = int(batch_size / gradient_accumulation_size)
 
 	if iterations % save_rate != 0:
 		adjustment = int(iterations / save_rate) * save_rate
@@ -332,6 +332,7 @@ def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, lear
 	else:
 		with open(validation_path, 'r', encoding="utf-8") as f:
 			validation_lines = len(f.readlines())
+
 
 		if validation_lines < validation_batch_size:
 			validation_batch_size = validation_lines
