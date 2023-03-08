@@ -410,29 +410,33 @@ def generate(
 			progress(0, "Loading voicefix...")
 			load_voicefixer()
 
-		fixed_cache = {}
-		for name in progress.tqdm(audio_cache, desc="Running voicefix..."):
-			del audio_cache[name]['audio']
-			if 'output' not in audio_cache[name] or not audio_cache[name]['output']:
-				continue
+		try:
+			fixed_cache = {}
+			for name in progress.tqdm(audio_cache, desc="Running voicefix..."):
+				del audio_cache[name]['audio']
+				if 'output' not in audio_cache[name] or not audio_cache[name]['output']:
+					continue
 
-			path = f'{outdir}/{voice}_{name}.wav'
-			fixed = f'{outdir}/{voice}_{name}_fixed.wav'
-			voicefixer.restore(
-				input=path,
-				output=fixed,
-				cuda=get_device_name() == "cuda" and args.voice_fixer_use_cuda,
-				#mode=mode,
-			)
+				path = f'{outdir}/{voice}_{name}.wav'
+				fixed = f'{outdir}/{voice}_{name}_fixed.wav'
+				voicefixer.restore(
+					input=path,
+					output=fixed,
+					cuda=get_device_name() == "cuda" and args.voice_fixer_use_cuda,
+					#mode=mode,
+				)
+				
+				fixed_cache[f'{name}_fixed'] = {
+					'settings': audio_cache[name]['settings'],
+					'output': True
+				}
+				audio_cache[name]['output'] = False
 			
-			fixed_cache[f'{name}_fixed'] = {
-				'settings': audio_cache[name]['settings'],
-				'output': True
-			}
-			audio_cache[name]['output'] = False
-		
-		for name in fixed_cache:
-			audio_cache[name] = fixed_cache[name]
+			for name in fixed_cache:
+				audio_cache[name] = fixed_cache[name]
+		except Exception as e:
+			print(e)
+			print("\nFailed to run Voicefixer")
 
 	for name in audio_cache:
 		if 'output' not in audio_cache[name] or not audio_cache[name]['output']:
