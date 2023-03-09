@@ -7,9 +7,9 @@ call .\venv\Scripts\activate.bat
 
 python -m pip install --upgrade pip
 python -m pip install -U -r .\requirements.txt
-python -m pip install -U -r .\tortoise-tts\requirements.txt
-python -m pip install -U -e .\tortoise-tts 
-python -m pip install -U -r .\dlas\requirements.txt
+python -m pip install -U -r .\modules\tortoise-tts\requirements.txt
+python -m pip install -U -e .\modules\tortoise-tts 
+python -m pip install -U -r .\modules\dlas\requirements.txt
 
 pause
 deactivate

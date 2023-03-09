@@ -33,10 +33,10 @@ if __name__ == "__main__":
 # this is some massive kludge that only works if it's called from a shell and not an import/PIP package
 # it's smart-yet-irritating module-model loader breaks when trying to load something specifically when not from a shell
 
-sys.path.insert(0, './dlas/codes/')
+sys.path.insert(0, './modules/dlas/codes/')
 # this is also because DLAS is not written as a package in mind
 # it'll gripe when it wants to import from train.py
-sys.path.insert(0, './dlas/')
+sys.path.insert(0, './modules/dlas/')
 
 # for PIP, replace it with:
 # sys.path.insert(0, os.path.dirname(os.path.realpath(dlas.__file__)))
