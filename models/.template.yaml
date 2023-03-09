@@ -94,8 +94,8 @@ steps:
 
 networks:
   gpt:
-    type: generator 
-    which_model_G: unified_voice2 # none of the unified_voice*.py files actually match the tortoise inference code... 4 and 3 have "alignment_head" (wtf is that?), 2 lacks the types=1 parameter.
+    type: generator
+    which_model_G: unified_voice2
     kwargs:
       layers: 30 # originally: 8
       model_dim: 1024 # originally: 512
@@ -112,8 +112,8 @@ networks:
       train_solo_embeddings: False # missing in uv3/4
       use_mel_codes_as_input: True # ditto
       checkpointing: True
-      #types: 1 # this is MISSING, but in my analysis 1 is equivalent to not having it.
-      #only_alignment_head: False  # uv3/4
+      tortoise_compat: True
+      # freeze_everything_but_position_embeddings: True
 
 path:
   strict_load: true
