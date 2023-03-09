@@ -1149,7 +1149,7 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, progres
 				continue
 			
 			if match[0] not in previous_list:
-				previous_list.append(f'{match[0]}.wav')
+				previous_list.append(f'{match[0].split("/")[-1]}.wav')
 
 	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
 		basename = os.path.basename(file)
@@ -1257,12 +1257,13 @@ def optimize_training_settings( **kwargs ):
 		settings['batch_size'] = lines
 		messages.append(f"Batch size is larger than your dataset, clamping batch size to: {settings['batch_size']}")	
 
+	"""
 	if lines % settings['batch_size'] != 0:
 		settings['batch_size'] = int(lines / settings['batch_size'])
 		if settings['batch_size'] == 0:
 			settings['batch_size'] = 1
 		messages.append(f"Batch size not neatly divisible by dataset size, adjusting batch size to: {settings['batch_size']}")
-	
+	"""
 	if settings['gradient_accumulation_size'] == 0:
 		settings['gradient_accumulation_size'] = 1
 	
@@ -1398,6 +1399,8 @@ def save_training_settings( **kwargs ):
 
 	if settings['gpus'] > get_device_count():
 		settings['gpus'] = get_device_count()
+
+	settings['optimizer'] = 'adamw' if settings['gpus'] == 1 else 'adamw_zero'
 
 	LEARNING_RATE_SCHEMES = ["MultiStepLR", "CosineAnnealingLR_Restart"]
 	if 'learning_rate_scheme' not in settings or settings['learning_rate_scheme'] not in LEARNING_RATE_SCHEMES:
