@@ -19,6 +19,7 @@ import gc
 import subprocess
 import psutil
 import yaml
+import hashlib
 
 import tqdm
 import torch
@@ -93,11 +94,11 @@ def generate(**kwargs):
 
 	voice_cache = {}
 	def fetch_voice( voice ):
-		print(f"Loading voice: {voice} with model {tts.autoregressive_model_hash[:8]}")
 		cache_key = f'{voice}:{tts.autoregressive_model_hash[:8]}'
 		if cache_key in voice_cache:
 			return voice_cache[cache_key]
 
+		print(f"Loading voice: {voice} with model {tts.autoregressive_model_hash[:8]}")
 		sample_voice = None
 		if voice == "microphone":
 			if parameters['mic_audio'] is None:
@@ -458,8 +459,6 @@ def cancel_generate():
 	tortoise.api.STOP_SIGNAL = True
 
 def hash_file(path, algo="md5", buffer_size=0):
-	import hashlib
-
 	hash = None
 	if algo == "md5":
 		hash = hashlib.md5()
@@ -1523,7 +1522,7 @@ def import_voices(files, saveAs=None, progress=None):
 def get_voice_list(dir=get_voice_dir(), append_defaults=False):
 	defaults = [ "random", "microphone" ]
 	os.makedirs(dir, exist_ok=True)
-	res = sorted([d for d in os.listdir(dir) if d is not in defaults and os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
+	res = sorted([d for d in os.listdir(dir) if d not in defaults and os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
 	if append_defaults:
 		res = res + defaults
 	return res
