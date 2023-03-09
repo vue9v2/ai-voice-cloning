@@ -1348,6 +1348,10 @@ def save_training_settings( **kwargs ):
 	settings = {}
 	settings.update(kwargs)
 
+	outjson = f'./training/{settings["voice"]}/train.json'
+	with open(outjson, 'w', encoding="utf-8") as f:
+		f.write(json.dumps(settings, indent='\t') )
+
 	settings['dataset_path'] = f"./training/{settings['voice']}/train.txt"
 	settings['validation_path'] = f"./training/{settings['voice']}/validation.txt"
 
@@ -1428,9 +1432,6 @@ def save_training_settings( **kwargs ):
 	if settings['dataset_path'] == settings['validation_path'] or not os.path.exists(settings['validation_path']):
 		settings['validation_enabled'] = 'false'
 	"""
-	outjson = f'./training/{settings["voice"]}/train.json'
-	with open(outjson, 'w', encoding="utf-8") as f:
-		f.write(json.dumps(settings, indent='\t') )
 
 	if settings['resume_state']:
 		settings['source_model'] = f"# pretrain_model_gpt: {settings['source_model']}"
