@@ -1856,10 +1856,12 @@ def import_generate_settings(file="./config/generate.json"):
 	res = []
 	if GENERATE_SETTINGS_ARGS is not None:
 		for k in GENERATE_SETTINGS_ARGS:
-			res.append(defaults[k] if not settings or settings[k] is None else settings[k])
+			if k not in defaults:
+				continue
+			res.append(defaults[k] if not settings or k not in settings or not settings[k] is None else settings[k])
 	else:
 		for k in defaults:
-			res.append(defaults[k] if not settings or settings[k] is None else settings[k])
+			res.append(defaults[k] if not settings or k not in settings or not settings[k] is None else settings[k])
 
 	return tuple(res)
 
