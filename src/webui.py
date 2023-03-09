@@ -430,21 +430,7 @@ def setup_gradio():
 				with gr.Row():
 					with gr.Column():
 						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_list())
-						with gr.Row():
-							refresh_configs = gr.Button(value="Refresh Configurations")
-						
-						training_loss_graph = gr.LinePlot(label="Training Metrics",
-							x="step",
-							y="value",
-							title="Training Metrics",
-							color="type",
-							tooltip=['step', 'value', 'type'],
-							width=600,
-							height=350,
-						)
-						view_losses = gr.Button(value="View Losses")
-
-					with gr.Column():
+						refresh_configs = gr.Button(value="Refresh Configurations")
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
 						
@@ -453,6 +439,27 @@ def setup_gradio():
 							start_training_button = gr.Button(value="Train")
 							stop_training_button = gr.Button(value="Stop")
 							reconnect_training_button = gr.Button(value="Reconnect")
+						
+					with gr.Column():
+						training_loss_graph = gr.LinePlot(label="Training Metrics",
+							x="step",
+							y="value",
+							title="Training Metrics",
+							color="type",
+							tooltip=['step', 'value', 'type'],
+							width=500,
+							height=350,
+						)
+						training_lr_graph = gr.LinePlot(label="Training Metrics",
+							x="step",
+							y="value",
+							title="Training Metrics",
+							color="type",
+							tooltip=['step', 'value', 'type'],
+							width=500,
+							height=350,
+						)
+						view_losses = gr.Button(value="View Losses")
 		with gr.Tab("Settings"):
 			with gr.Row():
 				exec_inputs = []
@@ -650,6 +657,7 @@ def setup_gradio():
 			inputs=None,
 			outputs=[
 				training_loss_graph,
+				training_lr_graph,
 			],
 			show_progress=False,
 		)
@@ -661,6 +669,7 @@ def setup_gradio():
 			],
 			outputs=[
 				training_loss_graph,
+				training_lr_graph,
 			],
 		)
 
