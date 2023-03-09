@@ -2069,6 +2069,9 @@ def load_voicefixer(restart=False):
 		print("Loaded Voicefixer")
 	except Exception as e:
 		print(f"Error occurred while tring to initialize voicefixer: {e}")
+		if voicefixer:
+			del voicefixer
+		voicefixer = None
 
 def unload_voicefixer():
 	global voicefixer
