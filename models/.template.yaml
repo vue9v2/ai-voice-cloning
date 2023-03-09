@@ -52,7 +52,7 @@ steps:
     loss_log_buffer: 500
 
     # Generally follows the recipe from the DALLE paper.
-    optimizer: adamw # this should be adamw_zero if you're using distributed training
+    optimizer: ${optimizer} # this should be adamw_zero if you're using distributed training
     optimizer_params:
       lr: !!float ${learning_rate} # originally: 1e-4
       weight_decay: !!float 1e-2

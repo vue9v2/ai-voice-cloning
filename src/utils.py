@@ -1363,6 +1363,10 @@ def save_training_settings( **kwargs ):
 
 	if settings['gpus'] > get_device_count():
 		settings['gpus'] = get_device_count()
+	if settings['gpus'] < 1:
+		settings['gpus'] = 1
+
+	settings['optimizer'] = 'adamw' if settings['gpus'] == 1 else 'adamw_zero'
 
 	LEARNING_RATE_SCHEMES = ["MultiStepLR", "CosineAnnealingLR_Restart"]
 	if 'learning_rate_scheme' not in settings or settings['learning_rate_scheme'] not in LEARNING_RATE_SCHEMES:
