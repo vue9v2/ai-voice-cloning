@@ -220,9 +220,9 @@ def generate(**kwargs):
 		if extension != ".json" and extension != ".wav":
 			continue
 		match = re.findall(rf"^{voice}_(\d+)(?:.+?)?{extension}$", filename)
-
-		key = int(match[0])
-		idx_cache[key] = True
+		if match and len(match) > 0:
+			key = int(match[0])
+			idx_cache[key] = True
 
 	if len(idx_cache) > 0:
 		keys = sorted(list(idx_cache.keys()))
