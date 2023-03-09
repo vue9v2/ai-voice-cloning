@@ -198,7 +198,7 @@ def optimize_training_settings_proxy( *args ):
 def import_training_settings_proxy( voice ):
 	messages = []
 	injson = f'./training/{voice}/train.json'
-	statedir = f'./training/{voice}/training_state/'
+	statedir = f'./training/{voice}/finetune/training_state/'
 
 	with open(injson, 'r', encoding="utf-8") as f:
 		settings = json.loads(f.read())
@@ -412,7 +412,7 @@ def setup_gradio():
 						with gr.Row():
 							TRAINING_SETTINGS["workers"] = gr.Number(label="Worker Processes", value=2, precision=0)
 							TRAINING_SETTINGS["gpus"] = gr.Number(label="GPUs", value=get_device_count(), precision=0)
-							
+
 						TRAINING_SETTINGS["source_model"] = gr.Dropdown( choices=autoregressive_models, label="Source Model", type="value", value=autoregressive_models[0] )
 						TRAINING_SETTINGS["resume_state"] = gr.Textbox(label="Resume State Path", placeholder="./training/${voice}/training_state/${last_state}.state")
 						
