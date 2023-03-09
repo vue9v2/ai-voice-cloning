@@ -268,20 +268,15 @@ def generate(**kwargs):
 
 		if latents and "latents" not in info:
 			voice = info['voice']
-			latents_path = f'{get_voice_dir()}/{voice}/cond_latents.pth'
+			model_hash = settings["model_hash"][:8] if settings is not None and "model_hash" in settings else tts.autoregressive_model_hash[:8]
+
+			dir = f'{get_voice_dir()}/{voice}/'
+			latents_path = f'{dir}/cond_latents_{model_hash}.pth'
 
 			if voice == "random" or voice == "microphone":
 				if latents and settings is not None and settings['conditioning_latents']:
-					dir = f'{get_voice_dir()}/{voice}/'
-					if not os.path.isdir(dir):
-						os.makedirs(dir, exist_ok=True)
-					latents_path = f'{dir}/cond_latents.pth'
+					os.makedirs(dir, exist_ok=True)
 					torch.save(conditioning_latents, latents_path)
-			else:
-				if settings is not None and "model_hash" in settings:
-					latents_path = f'{get_voice_dir()}/{voice}/cond_latents_{settings["model_hash"][:8]}.pth'
-				else:
-					latents_path = f'{get_voice_dir()}/{voice}/cond_latents_{tts.autoregressive_model_hash[:8]}.pth'
 
 			if latents_path and os.path.exists(latents_path):
 				try:
@@ -1526,10 +1521,11 @@ def import_voices(files, saveAs=None, progress=None):
 			print(f"Imported voice to {path}")
 
 def get_voice_list(dir=get_voice_dir(), append_defaults=False):
+	defaults = [ "random", "microphone" ]
 	os.makedirs(dir, exist_ok=True)
-	res = sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
+	res = sorted([d for d in os.listdir(dir) if d is not in defaults and os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
 	if append_defaults:
-		res = res + ["random", "microphone"]
+		res = res + defaults
 	return res
 
 def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
