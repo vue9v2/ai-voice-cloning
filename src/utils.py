@@ -1395,7 +1395,7 @@ def save_training_settings( **kwargs ):
 		settings['gpus'] = get_device_count()
 
 	# what an utter mistake this was
-	# settings['optimizer'] = 'adamw' if settings['gpus'] == 1 else 'adamw_zero'
+	settings['optimizer'] = 'adamw' # if settings['gpus'] == 1 else 'adamw_zero'
 
 	if 'learning_rate_scheme' not in settings or settings['learning_rate_scheme'] not in LEARNING_RATE_SCHEMES:
 		settings['learning_rate_scheme'] = "Multistep"
