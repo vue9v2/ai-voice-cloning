@@ -243,10 +243,10 @@ def generate(**kwargs):
 	def get_info( voice, settings = None, latents = True ):
 		info = {}
 		info.update(parameters)
-		info['time'] = time.time()-full_start_time,
+		info['time'] = time.time()-full_start_time
 
-		info['datetime'] = datetime.now().isoformat(),
-		info['model'] = tts.autoregressive_model_path,
+		info['datetime'] = datetime.now().isoformat()
+		info['model'] = tts.autoregressive_model_path
 		info['model_hash'] = tts.autoregressive_model_hash 
 		info['progress'] = None
 		del info['progress']
