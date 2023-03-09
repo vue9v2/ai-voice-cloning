@@ -46,6 +46,7 @@ sys.path.insert(0, './dlas/')
 # without kludge, it'll have to be accessible as `codes` and not `dlas`
 
 import torch
+import datetime
 from codes import train as tr
 from utils import util, options as option
 
@@ -71,7 +72,7 @@ def train(yaml, launcher='none'):
         print('Disabled distributed training.')
     else:
         opt['dist'] = True
-        tr.init_dist('nccl')
+        tr.init_dist('nccl', timeout=datetime.timedelta(seconds=5*60))
         trainer.world_size = torch.distributed.get_world_size()
         trainer.rank = torch.distributed.get_rank()
         torch.cuda.set_device(torch.distributed.get_rank())

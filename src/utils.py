@@ -34,7 +34,7 @@ from datetime import timedelta
 from tortoise.api import TextToSpeech, MODELS, get_model_path, pad_or_truncate
 from tortoise.utils.audio import load_audio, load_voice, load_voices, get_voice_dir
 from tortoise.utils.text import split_and_recombine_text
-from tortoise.utils.device import get_device_name, set_device_name
+from tortoise.utils.device import get_device_name, set_device_name, get_device_count
 
 MODELS['dvae.pth'] = "https://huggingface.co/jbetker/tortoise-tts-v2/resolve/3704aea61678e7e468a06d8eea121dba368a798e/.models/dvae.pth"
 
@@ -43,6 +43,8 @@ WHISPER_SPECIALIZED_MODELS = ["tiny.en", "base.en", "small.en", "medium.en"]
 WHISPER_BACKENDS = ["openai/whisper", "lightmare/whispercpp", "m-bain/whisperx"]
 
 VOCODERS = ['univnet', 'bigvgan_base_24khz_100band', 'bigvgan_24khz_100band']
+
+GENERATE_SETTINGS_ARGS = None
 
 EPOCH_SCHEDULE = [ 9, 18, 25, 33 ]
 
@@ -56,30 +58,17 @@ training_state = None
 
 current_voice = None
 
-def generate(
-	text,
-	delimiter,
-	emotion,
-	prompt,
-	voice,
-	mic_audio,
-	voice_latents_chunks,
-	seed,
-	candidates,
-	num_autoregressive_samples,
-	diffusion_iterations,
-	temperature,
-	diffusion_sampler,
-	breathing_room,
-	cvvp_weight,
-	top_p,
-	diffusion_temperature,
-	length_penalty,
-	repetition_penalty,
-	cond_free_k,
-	experimental_checkboxes,
-	progress=None
-):
+def generate(**kwargs):
+	parameters = {}
+	parameters.update(kwargs)
+
+	voice = parameters['voice']
+	progress = parameters['progress'] if 'progress' in parameters else None
+	if parameters['seed'] == 0:
+		parameters['seed'] = None
+
+	usedSeed = parameters['seed']
+
 	global args
 	global tts
 
@@ -90,6 +79,8 @@ def generate(
 		# should check if it's loading or unloaded, and load it if it's unloaded
 		if tts_loading:
 			raise Exception("TTS is still initializing...")
+		if progress is not None:
+			progress(0, "Initializing TTS...")
 		load_tts()
 	if hasattr(tts, "loading") and tts.loading:
 		raise Exception("TTS is still initializing...")
@@ -100,9 +91,6 @@ def generate(
 	conditioning_latents =None
 	sample_voice = None
 
-	if seed == 0:
-		seed = None
-
 	voice_cache = {}
 	def fetch_voice( voice ):
 		print(f"Loading voice: {voice} with model {tts.autoregressive_model_hash[:8]}")
@@ -112,9 +100,9 @@ def generate(
 
 		sample_voice = None
 		if voice == "microphone":
-			if mic_audio is None:
+			if parameters['mic_audio'] is None:
 				raise Exception("Please provide audio from mic when choosing `microphone` as a voice input")
-			voice_samples, conditioning_latents = [load_audio(mic_audio, tts.input_sample_rate)], None
+			voice_samples, conditioning_latents = [load_audio(parameters['mic_audio'], tts.input_sample_rate)], None
 		elif voice == "random":
 			voice_samples, conditioning_latents = None, tts.get_random_conditioning_latents()
 		else:
@@ -125,7 +113,7 @@ def generate(
 			
 		if voice_samples and len(voice_samples) > 0:
 			if conditioning_latents is None:
-				conditioning_latents = compute_latents(voice=voice, voice_samples=voice_samples, voice_latents_chunks=voice_latents_chunks)
+				conditioning_latents = compute_latents(voice=voice, voice_samples=voice_samples, voice_latents_chunks=parameters['voice_latents_chunks'])
 				
 			sample_voice = torch.cat(voice_samples, dim=-1).squeeze().cpu()
 			voice_samples = None
@@ -135,30 +123,30 @@ def generate(
 
 	def get_settings( override=None ):
 		settings = {
-			'temperature': float(temperature),
+			'temperature': float(parameters['temperature']),
 
-			'top_p': float(top_p),
-			'diffusion_temperature': float(diffusion_temperature),
-			'length_penalty': float(length_penalty),
-			'repetition_penalty': float(repetition_penalty),
-			'cond_free_k': float(cond_free_k),
+			'top_p': float(parameters['top_p']),
+			'diffusion_temperature': float(parameters['diffusion_temperature']),
+			'length_penalty': float(parameters['length_penalty']),
+			'repetition_penalty': float(parameters['repetition_penalty']),
+			'cond_free_k': float(parameters['cond_free_k']),
 
-			'num_autoregressive_samples': num_autoregressive_samples,
+			'num_autoregressive_samples': parameters['num_autoregressive_samples'],
 			'sample_batch_size': args.sample_batch_size,
-			'diffusion_iterations': diffusion_iterations,
+			'diffusion_iterations': parameters['diffusion_iterations'],
 
 			'voice_samples': None,
 			'conditioning_latents': None,
 
-			'use_deterministic_seed': seed,
+			'use_deterministic_seed': parameters['seed'],
 			'return_deterministic_state': True,
-			'k': candidates,
-			'diffusion_sampler': diffusion_sampler,
-			'breathing_room': breathing_room,
-			'progress': progress,
-			'half_p': "Half Precision" in experimental_checkboxes,
-			'cond_free': "Conditioning-Free" in experimental_checkboxes,
-			'cvvp_amount': cvvp_weight,
+			'k': parameters['candidates'],
+			'diffusion_sampler': parameters['diffusion_sampler'],
+			'breathing_room': parameters['breathing_room'],
+			'progress': parameters['progress'],
+			'half_p': "Half Precision" in parameters['experimentals'],
+			'cond_free': "Conditioning-Free" in parameters['experimentals'],
+			'cvvp_amount': parameters['cvvp_weight'],
 			'autoregressive_model': args.autoregressive_model,
 		}
 
@@ -182,11 +170,11 @@ def generate(
 
 		# clamp it down for the insane users who want this
 		# it would be wiser to enforce the sample size to the batch size, but this is what the user wants
-		sample_batch_size = args.sample_batch_size
-		if not sample_batch_size:
-			sample_batch_size = tts.autoregressive_batch_size
-		if num_autoregressive_samples < sample_batch_size:
-			settings['sample_batch_size'] = num_autoregressive_samples
+		settings['sample_batch_size'] = args.sample_batch_size
+		if not settings['sample_batch_size']:
+			settings['sample_batch_size'] = tts.autoregressive_batch_size
+		if settings['num_autoregressive_samples'] < settings['sample_batch_size']:
+			settings['sample_batch_size'] = settings['num_autoregressive_samples']
 
 		if settings['conditioning_latents'] is not None and len(settings['conditioning_latents']) == 2 and settings['cvvp_amount'] > 0:
 			print("Requesting weighing against CVVP weight, but voice latents are missing some extra data. Please regenerate your voice latents with 'Slimmer voice latents' unchecked.")
@@ -194,15 +182,15 @@ def generate(
 			
 		return settings
 
-	if not delimiter:
-		delimiter = "\n"
-	elif delimiter == "\\n":
-		delimiter = "\n"
+	if not parameters['delimiter']:
+		parameters['delimiter'] = "\n"
+	elif parameters['delimiter'] == "\\n":
+		parameters['delimiter'] = "\n"
 
-	if delimiter and delimiter != "" and delimiter in text:
-		texts = text.split(delimiter)
+	if parameters['delimiter'] and parameters['delimiter'] != "" and parameters['delimiter'] in parameters['text']:
+		texts = parameters['text'].split(parameters['delimiter'])
 	else:
-		texts = split_and_recombine_text(text)
+		texts = split_and_recombine_text(parameters['text'])
  
 	full_start_time = time.time()
  
@@ -248,37 +236,23 @@ def generate(
 			name = f"{name}_combined"
 		elif len(texts) > 1:
 			name = f"{name}_{line}"
-		if candidates > 1:
+		if parameters['candidates'] > 1:
 			name = f"{name}_{candidate}"
 		return name
 
 	def get_info( voice, settings = None, latents = True ):
-		info = {
-			'text': text,
-			'delimiter': '\\n' if delimiter and delimiter == "\n" else delimiter,
-			'emotion': emotion,
-			'prompt': prompt,
-			'voice': voice,
-			'seed': seed,
-			'candidates': candidates,
-			'num_autoregressive_samples': num_autoregressive_samples,
-			'diffusion_iterations': diffusion_iterations,
-			'temperature': temperature,
-			'diffusion_sampler': diffusion_sampler,
-			'breathing_room': breathing_room,
-			'cvvp_weight': cvvp_weight,
-			'top_p': top_p,
-			'diffusion_temperature': diffusion_temperature,
-			'length_penalty': length_penalty,
-			'repetition_penalty': repetition_penalty,
-			'cond_free_k': cond_free_k,
-			'experimentals': experimental_checkboxes,
-			'time': time.time()-full_start_time,
+		info = {}
+		info.update(parameters)
+		info['time'] = time.time()-full_start_time,
 
-			'datetime': datetime.now().isoformat(),
-			'model': tts.autoregressive_model_path,
-			'model_hash': tts.autoregressive_model_hash 
-		}
+		info['datetime'] = datetime.now().isoformat(),
+		info['model'] = tts.autoregressive_model_path,
+		info['model_hash'] = tts.autoregressive_model_hash 
+		info['progress'] = None
+		del info['progress']
+
+		if info['delimiter'] == "\n":
+			info['delimiter'] = "\\n"
 
 		if settings is not None:
 			for k in settings:
@@ -319,11 +293,11 @@ def generate(
 		return info
 
 	for line, cut_text in enumerate(texts):
-		if emotion == "Custom":
-			if prompt and prompt.strip() != "":
-				cut_text = f"[{prompt},] {cut_text}"
-		elif emotion != "None" and emotion:
-			cut_text = f"[I am really {emotion.lower()},] {cut_text}"
+		if parameters['emotion'] == "Custom":
+			if parameters['prompt'] and parameters['prompt'].strip() != "":
+				cut_text = f"[{parameters['prompt']},] {cut_text}"
+		elif parameters['emotion'] != "None" and parameters['emotion']:
+			cut_text = f"[I am really {parameters['emotion'].lower()},] {cut_text}"
 		
 		progress.msg_prefix = f'[{str(line+1)}/{str(len(texts))}]'
 		print(f"{progress.msg_prefix} Generating line: {cut_text}")
@@ -343,10 +317,10 @@ def generate(
 		settings = get_settings( override=override )
 		gen, additionals = tts.tts(cut_text, **settings )
 
-		seed = additionals[0]
+		parameters['seed'] = additionals[0]
 		run_time = time.time()-start_time
 		print(f"Generating line took {run_time} seconds")
- 
+
 		if not isinstance(gen, list):
 			gen = [gen]
 
@@ -382,7 +356,7 @@ def generate(
 		torchaudio.save(f'{outdir}/{voice}_{k}.wav', audio, args.output_sample_rate)
 
 	output_voices = []
-	for candidate in range(candidates):
+	for candidate in range(parameters['candidates']):
 		if len(texts) > 1:
 			audio_clips = []
 			for line in range(len(texts)):
@@ -466,7 +440,7 @@ def generate(
 	info = get_info(voice=voice, latents=False)
 	print(f"Generation took {info['time']} seconds, saved to '{output_voices[0]}'\n")
 
-	info['seed'] = seed
+	info['seed'] = usedSeed
 	if 'latents' in info:
 		del info['latents']
 
@@ -475,7 +449,7 @@ def generate(
 		f.write(json.dumps(info, indent='\t') )
 
 	stats = [
-		[ seed, "{:.3f}".format(info['time']) ]
+		[ parameters['seed'], "{:.3f}".format(info['time']) ]
 	]
 
 	return (
@@ -609,14 +583,16 @@ def compute_latents(voice=None, voice_samples=None, voice_latents_chunks=0, prog
 
 # superfluous, but it cleans up some things
 class TrainingState():
-	def __init__(self, config_path, keep_x_past_checkpoints=0, start=True, gpus=1):
+	def __init__(self, config_path, keep_x_past_checkpoints=0, start=True):
 		# parse config to get its iteration
 		with open(config_path, 'r') as file:
 			self.config = yaml.safe_load(file)
 
+		gpus = self.config["gpus"]
+
 		self.killed = False
 
-		self.dataset_dir = f"./training/{self.config['name']}/"
+		self.dataset_dir = f"./training/{self.config['name']}/finetune/"
 		self.batch_size = self.config['datasets']['train']['batch_size']
 		self.dataset_path = self.config['datasets']['train']['path']
 		with open(self.dataset_path, 'r', encoding="utf-8") as f:
@@ -996,7 +972,7 @@ except Exception as e:
 	print(e)
 	pass
 
-def run_training(config_path, verbose=False, gpus=1, keep_x_past_checkpoints=0, progress=gr.Progress(track_tqdm=True)):
+def run_training(config_path, verbose=False, keep_x_past_checkpoints=0, progress=gr.Progress(track_tqdm=True)):
 	global training_state
 	if training_state and training_state.process:
 		return "Training already in progress"
@@ -1008,26 +984,11 @@ def run_training(config_path, verbose=False, gpus=1, keep_x_past_checkpoints=0, 
 	# I don't know if this is still necessary, as it was bitching at me for not doing this, despite it being in a separate process
 	torch.multiprocessing.freeze_support()
 
-	# edit any gpu-count-specific variables
-	with open(config_path, 'r', encoding="utf-8") as f:
-		yaml_string = f.read()
-		edited = False
-		if gpus > 1:
-			yaml_string = yaml_string.replace(" adamw ", " adamw_zero ")
-			edited = True
-		else:
-			yaml_string = yaml_string.replace(" adamw_zero ", " adamw ")
-			edited = True
-	if edited:
-		print(f'Modified YAML config')
-		with open(config_path, 'w', encoding="utf-8") as f:
-			f.write(yaml_string)
-
 	unload_tts()
 	unload_whisper()
 	unload_voicefixer()
 
-	training_state = TrainingState(config_path=config_path, keep_x_past_checkpoints=keep_x_past_checkpoints, gpus=gpus)
+	training_state = TrainingState(config_path=config_path, keep_x_past_checkpoints=keep_x_past_checkpoints)
 
 	for line in iter(training_state.process.stdout.readline, ""):
 		if training_state.killed:
@@ -1169,7 +1130,7 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, progres
 	if whisper_model is None:
 		load_whisper_model(language=language)
 
-	os.makedirs(outdir, exist_ok=True)
+	os.makedirs(f'{outdir}/audio/', exist_ok=True)
 
 	results = {}
 	transcription = []
@@ -1216,10 +1177,10 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, progres
 				print(f"Error with {sliced_name}, skipping...")
 				continue
 
-			torchaudio.save(f"{outdir}/{sliced_name}", sliced_waveform, sampling_rate)
+			torchaudio.save(f"{outdir}/audio/{sliced_name}", sliced_waveform, sampling_rate)
 
 			idx = idx + 1
-			line = f"{sliced_name}|{segment['text'].strip()}"
+			line = f"audio/{sliced_name}|{segment['text'].strip()}"
 			transcription.append(line)
 			with open(f'{outdir}/train.txt', 'a', encoding="utf-8") as f:
 				f.write(f'\n{line}')
@@ -1283,125 +1244,142 @@ def calc_iterations( epochs, lines, batch_size ):
 def schedule_learning_rate( iterations, schedule=EPOCH_SCHEDULE ):
 	return [int(iterations * d) for d in schedule]
 
-def optimize_training_settings( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, validation_rate, resume_path, half_p, bnb, workers, source_model, voice ):
-	name = f"{voice}-finetune"
-	dataset_path = f"./training/{voice}/train.txt"
+def optimize_training_settings( **kwargs ):
+	messages = []
+	settings = {}
+	settings.update(kwargs)
 
+	dataset_path = f"./training/{settings['voice']}/train.txt"
 	with open(dataset_path, 'r', encoding="utf-8") as f:
 		lines = len(f.readlines())
 
-	messages = []
+	if settings['batch_size'] > lines:
+		settings['batch_size'] = lines
+		messages.append(f"Batch size is larger than your dataset, clamping batch size to: {settings['batch_size']}")	
 
-	if batch_size > lines:
-		batch_size = lines
-		messages.append(f"Batch size is larger than your dataset, clamping batch size to: {batch_size}")	
-
-	if batch_size % lines != 0:
-		nearest_slice = int(lines / batch_size) + 1
-		batch_size = int(lines / nearest_slice)
-		messages.append(f"Batch size not neatly divisible by dataset size, adjusting batch size to: {batch_size} ({nearest_slice} steps per epoch)")
+	if settings['batch_size'] % lines != 0:
+		nearest_slice = int(lines / settings['batch_size']) + 1
+		settings['batch_size'] = int(lines / nearest_slice)
+		messages.append(f"Batch size not neatly divisible by dataset size, adjusting batch size to: {settings['batch_size']} ({nearest_slice} steps per epoch)")
 	
-	if gradient_accumulation_size == 0:
-		gradient_accumulation_size = 1
+	if settings['gradient_accumulation_size'] == 0:
+		settings['gradient_accumulation_size'] = 1
 	
-	if batch_size / gradient_accumulation_size < 2:
-		gradient_accumulation_size = int(batch_size / 2)
-		if gradient_accumulation_size == 0:
-			gradient_accumulation_size = 1
+	if settings['batch_size'] / settings['gradient_accumulation_size'] < 2:
+		settings['gradient_accumulation_size'] = int(settings['batch_size'] / 2)
+		if settings['gradient_accumulation_size'] == 0:
+			settings['gradient_accumulation_size'] = 1
 
-		messages.append(f"Gradient accumulation size is too large for a given batch size, clamping gradient accumulation size to: {gradient_accumulation_size}")
-	elif batch_size % gradient_accumulation_size != 0:
-		gradient_accumulation_size = int(batch_size / gradient_accumulation_size)
-		if gradient_accumulation_size == 0:
-			gradient_accumulation_size = 1
+		messages.append(f"Gradient accumulation size is too large for a given batch size, clamping gradient accumulation size to: {settings['gradient_accumulation_size']}")
+	elif settings['batch_size'] % settings['gradient_accumulation_size'] != 0:
+		settings['gradient_accumulation_size'] = int(settings['batch_size'] / settings['gradient_accumulation_size'])
+		if settings['gradient_accumulation_size'] == 0:
+			settings['gradient_accumulation_size'] = 1
 
-		messages.append(f"Batch size is not evenly divisible by the gradient accumulation size, adjusting gradient accumulation size to: {gradient_accumulation_size}")
+		messages.append(f"Batch size is not evenly divisible by the gradient accumulation size, adjusting gradient accumulation size to: {settings['gradient_accumulation_size']}")
 
-	iterations = calc_iterations(epochs=epochs, lines=lines, batch_size=batch_size)
+	iterations = calc_iterations(epochs=settings['epochs'], lines=lines, batch_size=settings['batch_size'])
 
-	if epochs < print_rate:
-		print_rate = epochs
-		messages.append(f"Print rate is too small for the given iteration step, clamping print rate to: {print_rate}")
+	if settings['epochs'] < settings['print_rate']:
+		settings['print_rate'] = settings['epochs']
+		messages.append(f"Print rate is too small for the given iteration step, clamping print rate to: {settings['print_rate']}")
 	
-	if epochs < save_rate:
-		save_rate = epochs
-		messages.append(f"Save rate is too small for the given iteration step, clamping save rate to: {save_rate}")
+	if settings['epochs'] < settings['save_rate']:
+		settings['save_rate'] = settings['epochs']
+		messages.append(f"Save rate is too small for the given iteration step, clamping save rate to: {settings['save_rate']}")
 
-	if epochs < validation_rate:
-		validation_rate = epochs
-		messages.append(f"Validation rate is too small for the given iteration step, clamping validation rate to: {validation_rate}")
+	if settings['epochs'] < settings['validation_rate']:
+		settings['validation_rate'] = settings['epochs']
+		messages.append(f"Validation rate is too small for the given iteration step, clamping validation rate to: {settings['validation_rate']}")
 
-	if resume_path and not os.path.exists(resume_path):
-		resume_path = None
+	if settings['resume_state'] and not os.path.exists(settings['resume_state']):
+		settings['resume_state'] = None
 		messages.append("Resume path specified, but does not exist. Disabling...")
 
-	if bnb:
+	if settings['bitsandbytes']:
 		messages.append("BitsAndBytes requested. Please note this is ! EXPERIMENTAL !")
 
-	if half_p:
-		if bnb:
-			half_p = False
+	if settings['half_p']:
+		if settings['bitsandbytes']:
+			settings['half_p'] = False
 			messages.append("Half Precision requested, but BitsAndBytes is also requested. Due to redundancies, disabling half precision...")
 		else:
 			messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
 			if not os.path.exists(get_halfp_model_path()):
 				convert_to_halfp()	
 
-	messages.append(f"For {epochs} epochs with {lines} lines in batches of {batch_size}, iterating for {iterations} steps ({int(iterations / epochs)} steps per epoch)")
+	messages.append(f"For {settings['epochs']} epochs with {lines} lines in batches of {settings['batch_size']}, iterating for {iterations} steps ({int(iterations / settings['epochs'])} steps per epoch)")
 
-	return (
-		learning_rate,
-		text_ce_lr_weight,
-		learning_rate_schedule,
-		batch_size,
-		gradient_accumulation_size,
-		print_rate,
-		save_rate,
-		validation_rate,
-		resume_path,
-		messages
-	)
+	return settings, messages
 
-def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weight=None, learning_rate_scheme=None, learning_rate_schedule=None, batch_size=None, gradient_accumulation_size=None, print_rate=None, save_rate=None, validation_rate=None, name=None, dataset_name=None, dataset_path=None, validation_name=None, validation_path=None, validation_batch_size=None, output_name=None, resume_path=None, half_p=None, bnb=None, workers=None, source_model=None ):
-	if not source_model:
-		source_model = f"./models/tortoise/autoregressive{'_half' if half_p else ''}.pth"
+def save_training_settings( **kwargs ):
+	messages = []
+	settings = {}
+	settings.update(kwargs)
 
-	settings = {
-		"iterations": iterations if iterations else 500,
-		"batch_size": batch_size if batch_size else 64,
-		"learning_rate": learning_rate if learning_rate else 1e-5,
-		"gradient_accumulation_size": gradient_accumulation_size if gradient_accumulation_size else 4,
-		"print_rate": print_rate if print_rate else 1,
-		"save_rate": save_rate if save_rate else 50,
-		"name": name if name else "finetune",
-		"dataset_name": dataset_name if dataset_name else "finetune",
-		"dataset_path": dataset_path if dataset_path else "./training/finetune/train.txt",
-		"validation_name": validation_name if validation_name else "finetune",
-		"validation_path": validation_path if validation_path else "./training/finetune/train.txt",
-		'validation_rate': validation_rate if validation_rate else iterations,
-		"validation_batch_size": validation_batch_size if validation_batch_size else batch_size,
-		'validation_enabled': "true",
+	settings['dataset_path'] = f"./training/{settings['voice']}/train.txt"
+	settings['validation_path'] = f"./training/{settings['voice']}/validation.txt"
 
-		"text_ce_lr_weight": text_ce_lr_weight if text_ce_lr_weight else 0.01,
+	with open(settings['dataset_path'], 'r', encoding="utf-8") as f:
+		lines = len(f.readlines())
 
-		'resume_state': f"resume_state: '{resume_path}'",
-		'pretrain_model_gpt': f"pretrain_model_gpt: '{source_model}'",
+	if not settings['source_model'] or settings['source_model'] == "auto":
+		settings['source_model'] = f"./models/tortoise/autoregressive{'_half' if settings['half_p'] else ''}.pth"
 
-		'float16': 'true' if half_p else 'false',
-		'bitsandbytes': 'true' if bnb else 'false',
+	if settings['half_p']:
+		if not os.path.exists(get_halfp_model_path()):
+			convert_to_halfp()
 
-		'workers': workers if workers else 2,
-	}
+	settings['iterations'] = calc_iterations(epochs=settings['epochs'], lines=lines, batch_size=settings['batch_size'])
+	messages.append(f"For {settings['epochs']} epochs with {lines} lines, iterating for {settings['iterations']} steps")
+
+	settings['print_rate'] = int(settings['print_rate'] * settings['iterations'] / settings['epochs'])
+	settings['save_rate'] = int(settings['save_rate'] * settings['iterations'] / settings['epochs'])
+	settings['validation_rate'] = int(settings['validation_rate'] * settings['iterations'] / settings['epochs'])
+
+	settings['validation_batch_size'] = int(settings['batch_size'] / settings['gradient_accumulation_size'])
+
+	settings['iterations'] = calc_iterations(epochs=settings['epochs'], lines=lines, batch_size=settings['batch_size'])
+	if settings['iterations'] % settings['save_rate'] != 0:
+		adjustment = int(settings['iterations'] / settings['save_rate']) * settings['save_rate']
+		messages.append(f"Iteration rate is not evenly divisible by save rate, adjusting: {settings['iterations']} => {adjustment}")
+		settings['iterations'] = adjustment
+
+	if not os.path.exists(settings['validation_path']):
+		settings['validation_enabled'] = False
+		messages.append("Validation not found, disabling validation...")
+	elif settings['validation_batch_size'] == 0:
+		settings['validation_enabled'] = False
+		messages.append("Validation batch size == 0, disabling validation...")
+	else:
+		settings['validation_enabled'] = True
+		with open(settings['validation_path'], 'r', encoding="utf-8") as f:
+			validation_lines = len(f.readlines())
+
+		if validation_lines < settings['validation_batch_size']:
+			settings['validation_batch_size'] = validation_lines
+			messages.append(f"Batch size exceeds validation dataset size, clamping validation batch size to {validation_lines}")
+
+
+	if settings['gpus'] > get_device_count():
+		settings['gpus'] = get_device_count()
 
 	LEARNING_RATE_SCHEMES = ["MultiStepLR", "CosineAnnealingLR_Restart"]
-	if learning_rate_scheme not in LEARNING_RATE_SCHEMES:
-		learning_rate_scheme = LEARNING_RATE_SCHEMES[0]
+	if 'learning_rate_scheme' not in settings or settings['learning_rate_scheme'] not in LEARNING_RATE_SCHEMES:
+		settings['learning_rate_scheme'] = LEARNING_RATE_SCHEMES[0]
 
-	learning_rate_schema = [f"default_lr_scheme: {learning_rate_scheme}"]
-	if learning_rate_scheme == "MultiStepLR":
-		learning_rate_schema.append(f"  gen_lr_steps: {learning_rate_schedule if learning_rate_schedule else EPOCH_SCHEDULE}")
+	learning_rate_schema = [f"default_lr_scheme: {settings['learning_rate_scheme']}"]
+	if settings['learning_rate_scheme'] == "MultiStepLR":
+		if not settings['learning_rate_schedule']:
+			settings['learning_rate_schedule'] = EPOCH_SCHEDULE
+		elif isinstance(settings['learning_rate_schedule'],str):
+			settings['learning_rate_schedule'] = json.loads(settings['learning_rate_schedule'])
+
+		settings['learning_rate_schedule'] = schedule_learning_rate( settings['iterations'] / settings['epochs'], settings['learning_rate_schedule'] )
+
+		learning_rate_schema.append(f"  gen_lr_steps: {settings['learning_rate_schedule']}")
 		learning_rate_schema.append(f"  lr_gamma: 0.5")
-	elif learning_rate_scheme == "CosineAnnealingLR_Restart":
+	elif settings['learning_rate_scheme'] == "CosineAnnealingLR_Restart":
 		learning_rate_schema.append(f"  T_period: [120000, 120000, 120000]")
 		learning_rate_schema.append(f"  warmup: 10000")
 		learning_rate_schema.append(f"  eta_min: .01")
@@ -1409,23 +1387,26 @@ def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weig
 		learning_rate_schema.append(f"  restart_weights: [.5, .25]")
 	settings['learning_rate_scheme'] = "\n".join(learning_rate_schema)
 
-	if resume_path:
+	"""
+	if resume_state:
 		settings['pretrain_model_gpt'] = f"# {settings['pretrain_model_gpt']}"
 	else:
-		settings['resume_state'] = f"# resume_state: './training/{name if name else 'finetune'}/training_state/#.state'"
+		settings['resume_state'] = f"# resume_state: './training/{voice}/training_state/#.state'"
 
 	# also disable validation if it doesn't make sense to do it
 	if settings['dataset_path'] == settings['validation_path'] or not os.path.exists(settings['validation_path']):
 		settings['validation_enabled'] = 'false'
+	"""
+	outjson = f'./training/{settings["voice"]}/train.json'
+	with open(outjson, 'w', encoding="utf-8") as f:
+		f.write(json.dumps(settings, indent='\t') )
 
-
-	if half_p:
-		if not os.path.exists(get_halfp_model_path()):
-			convert_to_halfp()
-
-	if not output_name:
-		output_name = f'{settings["name"]}.yaml'
-
+	if settings['resume_state']:
+		settings['source_model'] = f"# pretrain_model_gpt: {settings['source_model']}"
+		settings['resume_state'] = f"resume_state: {settings['resume_state']}'"
+	else:
+		settings['source_model'] = f"pretrain_model_gpt: {settings['source_model']}"
+		settings['resume_state'] = f"# resume_state: {settings['resume_state']}'"
 
 	with open(f'./models/.template.yaml', 'r', encoding="utf-8") as f:
 		yaml = f.read()
@@ -1436,11 +1417,13 @@ def save_training_settings( iterations=None, learning_rate=None, text_ce_lr_weig
 			continue
 		yaml = yaml.replace(f"${{{k}}}", str(settings[k]))
 
-	outfile = f'./training/{output_name}'
-	with open(outfile, 'w', encoding="utf-8") as f:
+	outyaml = f'./training/{settings["voice"]}/train.yaml'
+	with open(outyaml, 'w', encoding="utf-8") as f:
 		f.write(yaml)
+	
 
-	return f"Training settings saved to: {outfile}"
+	messages.append(f"Saved training output to: {outyaml}")
+	return settings, messages
 
 def import_voices(files, saveAs=None, progress=None):
 	global args
@@ -1524,10 +1507,10 @@ def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
 	additionals = sorted([f'{dir}/{d}' for d in os.listdir(dir) if d[-4:] == ".pth" ])
 	found = []
 	for training in os.listdir(f'./training/'):
-		if not os.path.isdir(f'./training/{training}/') or not os.path.isdir(f'./training/{training}/models/'):
+		if not os.path.isdir(f'./training/{training}/') or not os.path.isdir(f'./training/{training}/finetunes/') or not os.path.isdir(f'./training/{training}/finetunes/models/'):
 			continue
-		models = sorted([ int(d[:-8]) for d in os.listdir(f'./training/{training}/models/') if d[-8:] == "_gpt.pth" ])
-		found = found + [ f'./training/{training}/models/{d}_gpt.pth' for d in models ]
+		models = sorted([ int(d[:-8]) for d in os.listdir(f'./training/{training}/finetunes/models/') if d[-8:] == "_gpt.pth" ])
+		found = found + [ f'./training/{training}/finetunes/models/{d}_gpt.pth' for d in models ]
 
 	if len(found) > 0 or len(additionals) > 0:
 		base = ["auto"] + base
@@ -1545,10 +1528,10 @@ def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
 	return res
 
 def get_dataset_list(dir="./training/"):
-	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.txt" in os.listdir(os.path.join(dir, d)) ])
+	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.txt" in os.listdir(os.path.join(dir, d)) ])
 
 def get_training_list(dir="./training/"):
-	return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
+	return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
 
 def do_gc():
 	gc.collect()
@@ -1734,35 +1717,38 @@ def setup_args():
 	
 	return args
 
-def update_args( listen, share, check_for_updates, models_from_local_only, low_vram, embed_output_metadata, latents_lean_and_mean, voice_fixer, voice_fixer_use_cuda, force_cpu_for_conditioning_latents, defer_tts_load, prune_nonfinal_outputs, device_override, sample_batch_size, concurrency_count, autocalculate_voice_chunk_duration_size, output_volume, autoregressive_model, vocoder_model, whisper_backend, whisper_model, training_default_halfp, training_default_bnb ):
+def update_args( **kwargs ):
 	global args
 
-	args.listen = listen
-	args.share = share
-	args.check_for_updates = check_for_updates
-	args.models_from_local_only = models_from_local_only
-	args.low_vram = low_vram
-	args.force_cpu_for_conditioning_latents = force_cpu_for_conditioning_latents
-	args.defer_tts_load = defer_tts_load
-	args.prune_nonfinal_outputs = prune_nonfinal_outputs
-	args.device_override = device_override
-	args.sample_batch_size = sample_batch_size
-	args.embed_output_metadata = embed_output_metadata
-	args.latents_lean_and_mean = latents_lean_and_mean
-	args.voice_fixer = voice_fixer
-	args.voice_fixer_use_cuda = voice_fixer_use_cuda
-	args.concurrency_count = concurrency_count
-	args.output_sample_rate = 44000
-	args.autocalculate_voice_chunk_duration_size = autocalculate_voice_chunk_duration_size
-	args.output_volume = output_volume
-	
-	args.autoregressive_model = autoregressive_model
-	args.vocoder_model = vocoder_model
-	args.whisper_backend = whisper_backend
-	args.whisper_model = whisper_model
+	settings = {}
+	settings.update(kwargs)
 
-	args.training_default_halfp = training_default_halfp
-	args.training_default_bnb = training_default_bnb
+	args.listen = settings['listen']
+	args.share = settings['share']
+	args.check_for_updates = settings['check_for_updates']
+	args.models_from_local_only = settings['models_from_local_only']
+	args.low_vram = settings['low_vram']
+	args.force_cpu_for_conditioning_latents = settings['force_cpu_for_conditioning_latents']
+	args.defer_tts_load = settings['defer_tts_load']
+	args.prune_nonfinal_outputs = settings['prune_nonfinal_outputs']
+	args.device_override = settings['device_override']
+	args.sample_batch_size = settings['sample_batch_size']
+	args.embed_output_metadata = settings['embed_output_metadata']
+	args.latents_lean_and_mean = settings['latents_lean_and_mean']
+	args.voice_fixer = settings['voice_fixer']
+	args.voice_fixer_use_cuda = settings['voice_fixer_use_cuda']
+	args.concurrency_count = settings['concurrency_count']
+	args.output_sample_rate = 44000
+	args.autocalculate_voice_chunk_duration_size = settings['autocalculate_voice_chunk_duration_size']
+	args.output_volume = settings['output_volume']
+	
+	args.autoregressive_model = settings['autoregressive_model']
+	args.vocoder_model = settings['vocoder_model']
+	args.whisper_backend = settings['whisper_backend']
+	args.whisper_model = settings['whisper_model']
+
+	args.training_default_halfp = settings['training_default_halfp']
+	args.training_default_bnb = settings['training_default_bnb']
 
 	save_args_settings()
 
@@ -1801,37 +1787,49 @@ def save_args_settings():
 	with open(f'./config/exec.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(settings, indent='\t') )
 
-
+# super kludgy )`;
+def set_generate_settings_arg_order(args):
+	global GENERATE_SETTINGS_ARGS
+	GENERATE_SETTINGS_ARGS = args
 
 def import_generate_settings(file="./config/generate.json"):
+	global GENERATE_SETTINGS_ARGS
+
+	defaults = {
+		'text': None,
+		'delimiter': None,
+		'emotion': None,
+		'prompt': None,
+		'voice': None,
+		'mic_audio': None,
+		'voice_latents_chunks': None,
+		'candidates': None,
+		'seed': None,
+		'num_autoregressive_samples': 16,
+		'diffusion_iterations': 30,
+		'temperature': 0.8,
+		'diffusion_sampler': "DDIM",
+		'breathing_room': 8  ,
+		'cvvp_weight': 0.0,
+		'top_p': 0.8,
+		'diffusion_temperature': 1.0,
+		'length_penalty': 1.0,
+		'repetition_penalty': 2.0,
+		'cond_free_k': 2.0,
+		'experimentals': None,
+	}
+
 	settings, _ = read_generate_settings(file, read_latents=False)
 	
-	if settings is None:
-		return None
+	res = []
+	if GENERATE_SETTINGS_ARGS is not None:
+		for k in GENERATE_SETTINGS_ARGS:
+			res.append(defaults[k] if not settings or settings[k] is None else settings[k])
+	else:
+		for k in defaults:
+			res.append(defaults[k] if not settings or settings[k] is None else settings[k])
 
-	return (
-		None if 'text' not in settings else settings['text'],
-		None if 'delimiter' not in settings else settings['delimiter'],
-		None if 'emotion' not in settings else settings['emotion'],
-		None if 'prompt' not in settings else settings['prompt'],
-		None if 'voice' not in settings else settings['voice'],
-		None,
-		None,
-		None if 'seed' not in settings else settings['seed'],
-		None if 'candidates' not in settings else settings['candidates'],
-		None if 'num_autoregressive_samples' not in settings else settings['num_autoregressive_samples'],
-		None if 'diffusion_iterations' not in settings else settings['diffusion_iterations'],
-		0.8 if 'temperature' not in settings else settings['temperature'],
-		"DDIM" if 'diffusion_sampler' not in settings else settings['diffusion_sampler'],
-		8   if 'breathing_room' not in settings else settings['breathing_room'],
-		0.0 if 'cvvp_weight' not in settings else settings['cvvp_weight'],
-		0.8 if 'top_p' not in settings else settings['top_p'],
-		1.0 if 'diffusion_temperature' not in settings else settings['diffusion_temperature'],
-		1.0 if 'length_penalty' not in settings else settings['length_penalty'],
-		2.0 if 'repetition_penalty' not in settings else settings['repetition_penalty'],
-		2.0 if 'cond_free_k' not in settings else settings['cond_free_k'],
-		None if 'experimentals' not in settings else settings['experimentals'],
-	)
+	return tuple(res)
 
 
 def reset_generation_settings():
@@ -1955,10 +1953,10 @@ def deduce_autoregressive_model(voice=None):
 		voice = get_current_voice()
 
 	if voice:
-		dir = f'./training/{voice}-finetune/models/'
-		if os.path.exists(f'./training/finetunes/{voice}.pth'):
-			return f'./training/finetunes/{voice}.pth'
+		if os.path.exists(f'./models/finetunes/{voice}.pth'):
+			return f'./models/finetunes/{voice}.pth'
 		
+		dir = f'./training/{voice}/finetune/models/'
 		if os.path.isdir(dir):
 			counts = sorted([ int(d[:-8]) for d in os.listdir(dir) if d[-8:] == "_gpt.pth" ])
 			names = [ f'{dir}/{d}_gpt.pth' for d in counts ]

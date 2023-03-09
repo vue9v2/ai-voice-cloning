@@ -1,16 +1,18 @@
-name: ${name}
+name: ${voice}
 model: extensibletrainer
 scale: 1
 gpu_ids: [0] # Superfluous, redundant, unnecessary, the way you launch the training script will set this
 start_step: 0
 checkpointing_enabled: true 
-fp16: ${float16}
+fp16: ${half_p}
+bitsandbytes: ${bitsandbytes}
+gpus: ${gpus}
 wandb: false 
 use_tb_logger: true
 
 datasets:
   train:
-    name: ${dataset_name}
+    name: training
     n_workers: ${workers}
     batch_size: ${batch_size}
     mode: paired_voice_audio
@@ -27,7 +29,7 @@ datasets:
     tokenizer_vocab: ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
   val: # I really do not care about validation right now
-    name: ${validation_name}
+    name: validation
     n_workers: ${workers}
     batch_size: ${validation_batch_size}
     mode: paired_voice_audio
@@ -114,8 +116,8 @@ networks:
       #only_alignment_head: False  # uv3/4
 
 path:
-  ${pretrain_model_gpt} 
   strict_load: true
+  ${source_model} 
   ${resume_state}
 
 train:

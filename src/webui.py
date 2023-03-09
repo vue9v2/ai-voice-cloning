@@ -4,6 +4,7 @@ import time
 import json
 import base64
 import re
+import inspect
 import urllib.request
 
 import torch
@@ -22,7 +23,38 @@ from utils import *
 
 args = setup_args()
 
-def run_generation(
+GENERATE_SETTINGS = {}
+TRANSCRIBE_SETTINGS = {}
+EXEC_SETTINGS = {}
+TRAINING_SETTINGS = {}
+
+PRESETS = {
+	'Ultra Fast': {'num_autoregressive_samples': 16, 'diffusion_iterations': 30, 'cond_free': False},
+	'Fast': {'num_autoregressive_samples': 96, 'diffusion_iterations': 80},
+	'Standard': {'num_autoregressive_samples': 256, 'diffusion_iterations': 200},
+	'High Quality': {'num_autoregressive_samples': 256, 'diffusion_iterations': 400},
+}
+
+HISTORY_HEADERS = {
+	"Name": "",
+	"Samples": "num_autoregressive_samples",
+	"Iterations": "diffusion_iterations",
+	"Temp.": "temperature",
+	"Sampler": "diffusion_sampler",
+	"CVVP": "cvvp_weight",
+	"Top P": "top_p",
+	"Diff. Temp.": "diffusion_temperature",
+	"Len Pen": "length_penalty",
+	"Rep Pen": "repetition_penalty",
+	"Cond-Free K": "cond_free_k",
+	"Time": "time",
+	"Datetime": "datetime",
+	"Model": "model",
+	"Model Hash": "model_hash",
+}
+
+# can't use *args OR **kwargs if I want to retain the ability to use progress
+def generate_proxy(
 	text,
 	delimiter,
 	emotion,
@@ -30,8 +62,8 @@ def run_generation(
 	voice,
 	mic_audio,
 	voice_latents_chunks,
-	seed,
 	candidates,
+	seed,
 	num_autoregressive_samples,
 	diffusion_iterations,
 	temperature,
@@ -43,47 +75,20 @@ def run_generation(
 	length_penalty,
 	repetition_penalty,
 	cond_free_k,
-	experimental_checkboxes,
+	experimentals,
 	progress=gr.Progress(track_tqdm=True)
 ):
-	if not text:
-		raise gr.Error("Please provide text.")
-	if not voice:
-		raise gr.Error("Please provide a voice.")
+	kwargs = locals()
 
 	try:
-		sample, outputs, stats = generate(
-			text=text,
-			delimiter=delimiter,
-			emotion=emotion,
-			prompt=prompt,
-			voice=voice,
-			mic_audio=mic_audio,
-			voice_latents_chunks=voice_latents_chunks,
-			seed=seed,
-			candidates=candidates,
-			num_autoregressive_samples=num_autoregressive_samples,
-			diffusion_iterations=diffusion_iterations,
-			temperature=temperature,
-			diffusion_sampler=diffusion_sampler,
-			breathing_room=breathing_room,
-			cvvp_weight=cvvp_weight,
-			top_p=top_p,
-			diffusion_temperature=diffusion_temperature,
-			length_penalty=length_penalty,
-			repetition_penalty=repetition_penalty,
-			cond_free_k=cond_free_k,
-			experimental_checkboxes=experimental_checkboxes,
-			progress=progress
-		)
+		sample, outputs, stats = generate(**kwargs)
 	except Exception as e:
 		message = str(e)
 		if message == "Kill signal detected":
 			unload_tts()
 
-		raise gr.Error(message)
+		raise e
 	
-
 	return (
 		outputs[0],
 		gr.update(value=sample, visible=sample is not None),
@@ -91,14 +96,8 @@ def run_generation(
 		gr.update(value=stats, visible=True),
 	)
 
+
 def update_presets(value):
-	PRESETS = {
-		'Ultra Fast': {'num_autoregressive_samples': 16, 'diffusion_iterations': 30, 'cond_free': False},
-		'Fast': {'num_autoregressive_samples': 96, 'diffusion_iterations': 80},
-		'Standard': {'num_autoregressive_samples': 256, 'diffusion_iterations': 200},
-		'High Quality': {'num_autoregressive_samples': 256, 'diffusion_iterations': 400},
-	}
-	
 	if value in PRESETS:
 		preset = PRESETS[value]
 		return (gr.update(value=preset['num_autoregressive_samples']), gr.update(value=preset['diffusion_iterations']))
@@ -117,24 +116,6 @@ def get_training_configs():
 def update_training_configs():
 	return gr.update(choices=get_training_list())
 
-history_headers = {
-	"Name": "",
-	"Samples": "num_autoregressive_samples",
-	"Iterations": "diffusion_iterations",
-	"Temp.": "temperature",
-	"Sampler": "diffusion_sampler",
-	"CVVP": "cvvp_weight",
-	"Top P": "top_p",
-	"Diff. Temp.": "diffusion_temperature",
-	"Len Pen": "length_penalty",
-	"Rep Pen": "repetition_penalty",
-	"Cond-Free K": "cond_free_k",
-	"Time": "time",
-	"Datetime": "datetime",
-	"Model": "model",
-	"Model Hash": "model_hash",
-}
-
 def history_view_results( voice ):
 	results = []
 	files = []
@@ -148,10 +129,10 @@ def history_view_results( voice ):
 			continue
 			
 		values = []
-		for k in history_headers:
+		for k in HISTORY_HEADERS:
 			v = file
 			if k != "Name":
-				v = metadata[history_headers[k]] if history_headers[k] in metadata else '?'
+				v = metadata[HISTORY_HEADERS[k]] if HISTORY_HEADERS[k] in metadata else '?'
 			values.append(v)
 
 
@@ -193,181 +174,55 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 def prepare_dataset_proxy( voice, language, skip_existings, progress=gr.Progress(track_tqdm=True) ):
 	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, progress=progress )
 
-def optimize_training_settings_proxy( *args, **kwargs ):
-	tup = optimize_training_settings(*args, **kwargs)
+def update_args_proxy( *args ):
+	kwargs = {}
+	keys = list(EXEC_SETTINGS.keys())
+	for i in range(len(args)):
+		k = keys[i]
+		v = args[i]
+		kwargs[k] = v
 
-	return (
-		gr.update(value=tup[0]),
-		gr.update(value=tup[1]),
-		gr.update(value=tup[2]),
-		gr.update(value=tup[3]),
-		gr.update(value=tup[4]),
-		gr.update(value=tup[5]),
-		gr.update(value=tup[6]),
-		gr.update(value=tup[7]),
-		gr.update(value=tup[8]),
-		"\n".join(tup[9])
-	)
+	update_args(**kwargs)
+def optimize_training_settings_proxy( *args ):
+	kwargs = {}
+	keys = list(TRAINING_SETTINGS.keys())
+	for i in range(len(args)):
+		k = keys[i]
+		v = args[i]
+		kwargs[k] = v
+
+	settings, messages = optimize_training_settings(**kwargs)
+	output = list(settings.values())
+	return output[:-1] + ["\n".join(messages)]
 
 def import_training_settings_proxy( voice ):
-	indir = f'./training/{voice}/'
-	outdir = f'./training/{voice}-finetune/'
-
-	in_config_path = f"{indir}/train.yaml"
-	out_config_path = None
-	out_configs = []
-	if os.path.isdir(outdir):
-		out_configs = sorted([d[:-5] for d in os.listdir(outdir) if d[-5:] == ".yaml" ])
-	if len(out_configs) > 0:
-		out_config_path = f'{outdir}/{out_configs[-1]}.yaml'
-
-	config_path = out_config_path if out_config_path else in_config_path
-
 	messages = []
-	with open(config_path, 'r') as file:
-		config = yaml.safe_load(file)
-		messages.append(f"Importing from: {config_path}")
+	injson = f'./training/{voice}/train.json'
+	statedir = f'./training/{voice}/training_state/'
 
-	dataset_path = f"./training/{voice}/train.txt"
-	with open(dataset_path, 'r', encoding="utf-8") as f:
-		lines = len(f.readlines())
-		messages.append(f"Basing epoch size to {lines} lines")
-
-	batch_size = config['datasets']['train']['batch_size']
-	gradient_accumulation_size = config['train']['mega_batch_factor']
-
-	iterations = config['train']['niter']
-	steps_per_iteration = int(lines / batch_size)
-	epochs = int(iterations / steps_per_iteration)
-
-
-	learning_rate = config['steps']['gpt_train']['optimizer_params']['lr']
-	text_ce_lr_weight = config['steps']['gpt_train']['losses']['text_ce']['weight']
-	learning_rate_schedule = [ int(x / steps_per_iteration) for x in config['train']['gen_lr_steps'] ]
-
-
-	print_rate = int(config['logger']['print_freq'] / steps_per_iteration)
-	save_rate = int(config['logger']['save_checkpoint_freq'] / steps_per_iteration)
-	validation_rate = int(config['train']['val_freq'] / steps_per_iteration)
-
-	half_p = config['fp16']
-	bnb = True
-
-	statedir = f'{outdir}/training_state/'
-	resumes = []
-	resume_path = None
-	source_model = get_halfp_model_path() if half_p else get_model_path('autoregressive.pth')
-	
-	if "pretrain_model_gpt" in config['path']:
-		source_model = config['path']['pretrain_model_gpt']
-	elif "resume_state" in config['path']:
-		resume_path = config['path']['resume_state']
-
+	with open(injson, 'r', encoding="utf-8") as f:
+		settings = json.loads(f.read())
 
 	if os.path.isdir(statedir):
 		resumes = sorted([int(d[:-6]) for d in os.listdir(statedir) if d[-6:] == ".state" ])
 
-	if len(resumes) > 0:
-		resume_path = f'{statedir}/{resumes[-1]}.state'
-		messages.append(f"Latest resume found: {resume_path}")
+		if len(resumes) > 0:
+			settings['resume_state'] = f'{statedir}/{resumes[-1]}.state'
+			messages.append(f"Found most recent training state: {settings['resume_state']}")
 
+	output = list(settings.values())
+	messages.append(f"Imported training settings: {injson}")
+	return output[:-1] + ["\n".join(messages)]
 
+def save_training_settings_proxy( *args ):
+	kwargs = {}
+	keys = list(TRAINING_SETTINGS.keys())
+	for i in range(len(args)):
+		k = keys[i]
+		v = args[i]
+		kwargs[k] = v
 
-	if "ext" in config and "bitsandbytes" in config["ext"]:
-		bnb = config["ext"]["bitsandbytes"]
-
-	workers = config['datasets']['train']['n_workers']
-
-	messages = "\n".join(messages)
-
-	return (
-		epochs,
-		learning_rate,
-		text_ce_lr_weight,
-		learning_rate_schedule,
-		batch_size,
-		gradient_accumulation_size,
-		print_rate,
-		save_rate,
-		validation_rate,
-		resume_path,
-		half_p,
-		bnb,
-		workers,
-		source_model,
-		messages
-	)
-
-
-def save_training_settings_proxy( epochs, learning_rate, text_ce_lr_weight, learning_rate_schedule, batch_size, gradient_accumulation_size, print_rate, save_rate, validation_rate, resume_path, half_p, bnb, workers, source_model, voice ):
-	name = f"{voice}-finetune"
-	dataset_name = f"{voice}-train"
-	dataset_path = f"./training/{voice}/train.txt"
-	validation_name = f"{voice}-val"
-	validation_path = f"./training/{voice}/validation.txt"
-
-	with open(dataset_path, 'r', encoding="utf-8") as f:
-		lines = len(f.readlines())
-
-	messages = []
-
-	iterations = calc_iterations(epochs=epochs, lines=lines, batch_size=batch_size)
-	messages.append(f"For {epochs} epochs with {lines} lines, iterating for {iterations} steps")
-
-	print_rate = int(print_rate * iterations / epochs)
-	save_rate = int(save_rate * iterations / epochs)
-	validation_rate = int(validation_rate * iterations / epochs)
-
-	validation_batch_size = int(batch_size / gradient_accumulation_size)
-
-	if iterations % save_rate != 0:
-		adjustment = int(iterations / save_rate) * save_rate
-		messages.append(f"Iteration rate is not evenly divisible by save rate, adjusting: {iterations} => {adjustment}")
-		iterations = adjustment
-
-	if not os.path.exists(validation_path):
-		validation_rate = iterations
-		validation_path = dataset_path
-		messages.append("Validation not found, disabling validation...")
-	else:
-		with open(validation_path, 'r', encoding="utf-8") as f:
-			validation_lines = len(f.readlines())
-
-
-		if validation_lines < validation_batch_size:
-			validation_batch_size = validation_lines
-			messages.append(f"Batch size exceeds validation dataset size, clamping validation batch size to {validation_lines}")
-
-	if not learning_rate_schedule:
-		learning_rate_schedule = EPOCH_SCHEDULE
-	elif isinstance(learning_rate_schedule,str):
-		learning_rate_schedule = json.loads(learning_rate_schedule)
-
-	learning_rate_schedule = schedule_learning_rate( iterations / epochs, learning_rate_schedule )
-
-	messages.append(save_training_settings(
-		iterations=iterations,
-		batch_size=batch_size,
-		learning_rate=learning_rate,
-		text_ce_lr_weight=text_ce_lr_weight,
-		learning_rate_schedule=learning_rate_schedule,
-		gradient_accumulation_size=gradient_accumulation_size,
-		print_rate=print_rate,
-		save_rate=save_rate,
-		validation_rate=validation_rate,
-		name=name,
-		dataset_name=dataset_name,
-		dataset_path=dataset_path,
-		validation_name=validation_name,
-		validation_path=validation_path,
-		validation_batch_size=validation_batch_size,
-		output_name=f"{voice}/train.yaml",
-		resume_path=resume_path,
-		half_p=half_p,
-		bnb=bnb,
-		workers=workers,
-		source_model=source_model,
-	))
+	settings, messages = save_training_settings(**kwargs)
 	return "\n".join(messages)
 
 def update_voices():
@@ -406,60 +261,68 @@ def setup_gradio():
 	autoregressive_models = get_autoregressive_models()
 	dataset_list = get_dataset_list()
 
+	GENERATE_SETTINGS_ARGS = list(inspect.signature(generate_proxy).parameters.keys())[:-1]
+	for i in range(len(GENERATE_SETTINGS_ARGS)):
+		arg = GENERATE_SETTINGS_ARGS[i]
+		GENERATE_SETTINGS[arg] = None
+	set_generate_settings_arg_order(GENERATE_SETTINGS_ARGS)
+
 	with gr.Blocks() as ui:
 		with gr.Tab("Generate"):
 			with gr.Row():
 				with gr.Column():
-					text = gr.Textbox(lines=4, label="Input Prompt")
+					GENERATE_SETTINGS["text"] = gr.Textbox(lines=4, label="Input Prompt")
 			with gr.Row():
 				with gr.Column():
-					delimiter = gr.Textbox(lines=1, label="Line Delimiter", placeholder="\\n")
+					GENERATE_SETTINGS["delimiter"] = gr.Textbox(lines=1, label="Line Delimiter", placeholder="\\n")
 
-					emotion = gr.Radio( ["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom", "None"], value="None", label="Emotion", type="value", interactive=True )
-					prompt = gr.Textbox(lines=1, label="Custom Emotion")
-					voice = gr.Dropdown(choices=voice_list_with_defaults, label="Voice", type="value", value=voice_list_with_defaults[0]) # it'd be very cash money if gradio was able to default to the first value in the list without this shit
-					mic_audio = gr.Audio( label="Microphone Source", source="microphone", type="filepath", visible=False )
-					voice_latents_chunks = gr.Number(label="Voice Chunks", precision=0, value=0)
+					GENERATE_SETTINGS["emotion"] = gr.Radio( ["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom", "None"], value="None", label="Emotion", type="value", interactive=True )
+					GENERATE_SETTINGS["prompt"] = gr.Textbox(lines=1, label="Custom Emotion", visible=False)
+					GENERATE_SETTINGS["voice"] = gr.Dropdown(choices=voice_list_with_defaults, label="Voice", type="value", value=voice_list_with_defaults[0]) # it'd be very cash money if gradio was able to default to the first value in the list without this shit
+					GENERATE_SETTINGS["mic_audio"] = gr.Audio( label="Microphone Source", source="microphone", type="filepath", visible=False )
+					GENERATE_SETTINGS["voice_latents_chunks"] = gr.Number(label="Voice Chunks", precision=0, value=0)
 					with gr.Row():
 						refresh_voices = gr.Button(value="Refresh Voice List")
 						recompute_voice_latents = gr.Button(value="(Re)Compute Voice Latents")
 
-					voice.change(
+					GENERATE_SETTINGS["voice"].change(
 						fn=update_baseline_for_latents_chunks,
-						inputs=voice,
-						outputs=voice_latents_chunks
+						inputs=GENERATE_SETTINGS["voice"],
+						outputs=GENERATE_SETTINGS["voice_latents_chunks"]
 					)
-					voice.change(
+					GENERATE_SETTINGS["voice"].change(
 						fn=lambda value: gr.update(visible=value == "microphone"),
-						inputs=voice,
-						outputs=mic_audio,
+						inputs=GENERATE_SETTINGS["voice"],
+						outputs=GENERATE_SETTINGS["mic_audio"],
 					)
 				with gr.Column():
-					candidates = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates")
-					seed = gr.Number(value=0, precision=0, label="Seed")
+					GENERATE_SETTINGS["candidates"] = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates")
+					GENERATE_SETTINGS["seed"] = gr.Number(value=0, precision=0, label="Seed")
 
 					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value" )
-					num_autoregressive_samples = gr.Slider(value=128, minimum=2, maximum=512, step=1, label="Samples")
-					diffusion_iterations = gr.Slider(value=128, minimum=0, maximum=512, step=1, label="Iterations")
 
-					temperature = gr.Slider(value=0.2, minimum=0, maximum=1, step=0.1, label="Temperature")
+					GENERATE_SETTINGS["num_autoregressive_samples"] = gr.Slider(value=128, minimum=2, maximum=512, step=1, label="Samples")
+					GENERATE_SETTINGS["diffusion_iterations"] = gr.Slider(value=128, minimum=0, maximum=512, step=1, label="Iterations")
+
+					GENERATE_SETTINGS["temperature"] = gr.Slider(value=0.2, minimum=0, maximum=1, step=0.1, label="Temperature")
+					
 					show_experimental_settings = gr.Checkbox(label="Show Experimental Settings")
 					reset_generation_settings_button = gr.Button(value="Reset to Default")
 				with gr.Column(visible=False) as col:
 					experimental_column = col
 
-					experimental_checkboxes = gr.CheckboxGroup(["Half Precision", "Conditioning-Free"], value=["Conditioning-Free"], label="Experimental Flags")
-					breathing_room = gr.Slider(value=8, minimum=1, maximum=32, step=1, label="Pause Size")
-					diffusion_sampler = gr.Radio(
+					GENERATE_SETTINGS["experimentals"] = gr.CheckboxGroup(["Half Precision", "Conditioning-Free"], value=["Conditioning-Free"], label="Experimental Flags")
+					GENERATE_SETTINGS["breathing_room"] = gr.Slider(value=8, minimum=1, maximum=32, step=1, label="Pause Size")
+					GENERATE_SETTINGS["diffusion_sampler"] = gr.Radio(
 						["P", "DDIM"], # + ["K_Euler_A", "DPM++2M"],
 						value="DDIM", label="Diffusion Samplers", type="value"
 					)
-					cvvp_weight = gr.Slider(value=0, minimum=0, maximum=1, label="CVVP Weight")
-					top_p = gr.Slider(value=0.8, minimum=0, maximum=1, label="Top P")
-					diffusion_temperature = gr.Slider(value=1.0, minimum=0, maximum=1, label="Diffusion Temperature")
-					length_penalty = gr.Slider(value=1.0, minimum=0, maximum=8, label="Length Penalty")
-					repetition_penalty = gr.Slider(value=2.0, minimum=0, maximum=8, label="Repetition Penalty")
-					cond_free_k = gr.Slider(value=2.0, minimum=0, maximum=4, label="Conditioning-Free K")
+					GENERATE_SETTINGS["cvvp_weight"] = gr.Slider(value=0, minimum=0, maximum=1, label="CVVP Weight")
+					GENERATE_SETTINGS["top_p"] = gr.Slider(value=0.8, minimum=0, maximum=1, label="Top P")
+					GENERATE_SETTINGS["diffusion_temperature"] = gr.Slider(value=1.0, minimum=0, maximum=1, label="Diffusion Temperature")
+					GENERATE_SETTINGS["length_penalty"] = gr.Slider(value=1.0, minimum=0, maximum=8, label="Length Penalty")
+					GENERATE_SETTINGS["repetition_penalty"] = gr.Slider(value=2.0, minimum=0, maximum=8, label="Repetition Penalty")
+					GENERATE_SETTINGS["cond_free_k"] = gr.Slider(value=2.0, minimum=0, maximum=4, label="Conditioning-Free K")
 				with gr.Column():
 					with gr.Row():
 						submit = gr.Button(value="Generate")
@@ -483,7 +346,7 @@ def setup_gradio():
 		with gr.Tab("History"):
 			with gr.Row():
 				with gr.Column():
-					history_info = gr.Dataframe(label="Results", headers=list(history_headers.keys()))
+					history_info = gr.Dataframe(label="Results", headers=list(HISTORY_HEADERS.keys()))
 			with gr.Row():
 				with gr.Column():
 					history_voices = gr.Dropdown(choices=result_voices, label="Voice", type="value", value=result_voices[0] if len(result_voices) > 0 else "")
@@ -521,51 +384,40 @@ def setup_gradio():
 			with gr.Tab("Generate Configuration"):
 				with gr.Row():
 					with gr.Column():
-						training_settings = [
-							gr.Number(label="Epochs", value=500, precision=0),
-						]
+						TRAINING_SETTINGS["epochs"] = gr.Number(label="Epochs", value=500, precision=0)
 						with gr.Row():
 							with gr.Column():
-								training_settings = training_settings + [
-									gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6),
-									gr.Slider(label="Text_CE LR Ratio", value=0.01, minimum=0, maximum=1),
-								]
-							training_settings = training_settings + [
-								gr.Textbox(label="Learning Rate Schedule", placeholder=str(EPOCH_SCHEDULE)),
-							]
+								TRAINING_SETTINGS["learning_rate"] = gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6)
+								TRAINING_SETTINGS["text_ce_lr_weight"] = gr.Slider(label="Text_CE LR Ratio", value=0.01, minimum=0, maximum=1)
+							
+							TRAINING_SETTINGS["learning_rate_schedule"] = gr.Textbox(label="Learning Rate Schedule", placeholder=str(EPOCH_SCHEDULE))
 						with gr.Row():
-							training_settings = training_settings + [
-								gr.Number(label="Batch Size", value=128, precision=0),
-								gr.Number(label="Gradient Accumulation Size", value=4, precision=0),
-							]
+							TRAINING_SETTINGS["batch_size"] = gr.Number(label="Batch Size", value=128, precision=0)
+							TRAINING_SETTINGS["gradient_accumulation_size"] = gr.Number(label="Gradient Accumulation Size", value=4, precision=0)
 						with gr.Row():
-							training_settings = training_settings + [
-								gr.Number(label="Print Frequency (in epochs)", value=5, precision=0),
-								gr.Number(label="Save Frequency (in epochs)", value=5, precision=0),
-								gr.Number(label="Validation Frequency (in epochs)", value=5, precision=0),
-							]
-						training_settings = training_settings + [
-							gr.Textbox(label="Resume State Path", placeholder="./training/${voice}-finetune/training_state/${last_state}.state"),
-						]
+							TRAINING_SETTINGS["print_rate"] = gr.Number(label="Print Frequency (in epochs)", value=5, precision=0)
+							TRAINING_SETTINGS["save_rate"] = gr.Number(label="Save Frequency (in epochs)", value=5, precision=0)
+							TRAINING_SETTINGS["validation_rate"] = gr.Number(label="Validation Frequency (in epochs)", value=5, precision=0)
 
 						with gr.Row():
-							training_halfp = gr.Checkbox(label="Half Precision", value=args.training_default_halfp)
-							training_bnb = gr.Checkbox(label="BitsAndBytes", value=args.training_default_bnb)
+							TRAINING_SETTINGS["half_p"] = gr.Checkbox(label="Half Precision", value=args.training_default_halfp)
+							TRAINING_SETTINGS["bitsandbytes"] = gr.Checkbox(label="BitsAndBytes", value=args.training_default_bnb)
 
-						training_workers = gr.Number(label="Worker Processes", value=2, precision=0)
-
-						source_model = gr.Dropdown( choices=autoregressive_models, label="Source Model", type="value", value=autoregressive_models[0] )
-						dataset_list_dropdown = gr.Dropdown( choices=dataset_list, label="Dataset", type="value", value=dataset_list[0] if len(dataset_list) else ""  )
-						training_settings = training_settings + [ training_halfp, training_bnb, training_workers, source_model, dataset_list_dropdown ]
+						TRAINING_SETTINGS["workers"] = gr.Number(label="Worker Processes", value=2, precision=0)
+						TRAINING_SETTINGS["gpus"] = gr.Number(label="GPUs", value=get_device_count(), precision=0)
+						TRAINING_SETTINGS["source_model"] = gr.Dropdown( choices=autoregressive_models, label="Source Model", type="value", value=autoregressive_models[0] )
+						TRAINING_SETTINGS["resume_state"] = gr.Textbox(label="Resume State Path", placeholder="./training/${voice}/training_state/${last_state}.state")
+						
+						TRAINING_SETTINGS["voice"] = gr.Dropdown( choices=dataset_list, label="Dataset", type="value", value=dataset_list[0] if len(dataset_list) else ""  )
 
 						with gr.Row():
-							refresh_dataset_list = gr.Button(value="Refresh Dataset List")
-							import_dataset_button = gr.Button(value="Reuse/Import Dataset")
+							training_refresh_dataset = gr.Button(value="Refresh Dataset List")
+							training_import_settings = gr.Button(value="Reuse/Import Dataset")
 					with gr.Column():
-						save_yaml_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
+						training_configuration_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						with gr.Row():
-							optimize_yaml_button = gr.Button(value="Validate Training Configuration")
-							save_yaml_button = gr.Button(value="Save Training Configuration")
+							training_optimize_configuration = gr.Button(value="Validate Training Configuration")
+							training_save_configuration = gr.Button(value="Save Training Configuration")
 			with gr.Tab("Run Training"):
 				with gr.Row():
 					with gr.Column():
@@ -588,9 +440,7 @@ def setup_gradio():
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
 						
-						with gr.Row():
-							training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
-							training_gpu_count = gr.Number(label="GPUs", value=get_device_count())
+						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
 						with gr.Row():
 							start_training_button = gr.Button(value="Train")
 							stop_training_button = gr.Button(value="Stop")
@@ -599,43 +449,40 @@ def setup_gradio():
 			with gr.Row():
 				exec_inputs = []
 				with gr.Column():
-					exec_inputs = exec_inputs + [
-						gr.Textbox(label="Listen", value=args.listen, placeholder="127.0.0.1:7860/"),
-						gr.Checkbox(label="Public Share Gradio", value=args.share),
-						gr.Checkbox(label="Check For Updates", value=args.check_for_updates),
-						gr.Checkbox(label="Only Load Models Locally", value=args.models_from_local_only),
-						gr.Checkbox(label="Low VRAM", value=args.low_vram),
-						gr.Checkbox(label="Embed Output Metadata", value=args.embed_output_metadata),
-						gr.Checkbox(label="Slimmer Computed Latents", value=args.latents_lean_and_mean),
-						gr.Checkbox(label="Use Voice Fixer on Generated Output", value=args.voice_fixer),
-						gr.Checkbox(label="Use CUDA for Voice Fixer", value=args.voice_fixer_use_cuda),
-						gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents),
-						gr.Checkbox(label="Do Not Load TTS On Startup", value=args.defer_tts_load),
-						gr.Checkbox(label="Delete Non-Final Output", value=args.prune_nonfinal_outputs),
-						gr.Textbox(label="Device Override", value=args.device_override),
-					]
+					EXEC_SETTINGS['listen'] = gr.Textbox(label="Listen", value=args.listen, placeholder="127.0.0.1:7860/")
+					EXEC_SETTINGS['share'] = gr.Checkbox(label="Public Share Gradio", value=args.share)
+					EXEC_SETTINGS['check_for_updates'] = gr.Checkbox(label="Check For Updates", value=args.check_for_updates)
+					EXEC_SETTINGS['models_from_local_only'] = gr.Checkbox(label="Only Load Models Locally", value=args.models_from_local_only)
+					EXEC_SETTINGS['low_vram'] = gr.Checkbox(label="Low VRAM", value=args.low_vram)
+					EXEC_SETTINGS['embed_output_metadata'] = gr.Checkbox(label="Embed Output Metadata", value=args.embed_output_metadata)
+					EXEC_SETTINGS['latents_lean_and_mean'] = gr.Checkbox(label="Slimmer Computed Latents", value=args.latents_lean_and_mean)
+					EXEC_SETTINGS['voice_fixer'] = gr.Checkbox(label="Use Voice Fixer on Generated Output", value=args.voice_fixer)
+					EXEC_SETTINGS['voice_fixer_use_cuda'] = gr.Checkbox(label="Use CUDA for Voice Fixer", value=args.voice_fixer_use_cuda)
+					EXEC_SETTINGS['force_cpu_for_conditioning_latents'] = gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents)
+					EXEC_SETTINGS['defer_tts_load'] = gr.Checkbox(label="Do Not Load TTS On Startup", value=args.defer_tts_load)
+					EXEC_SETTINGS['prune_nonfinal_outputs'] = gr.Checkbox(label="Delete Non-Final Output", value=args.prune_nonfinal_outputs)
+					EXEC_SETTINGS['device_override'] = gr.Textbox(label="Device Override", value=args.device_override)
 				with gr.Column():
-					exec_inputs = exec_inputs + [
-						gr.Number(label="Sample Batch Size", precision=0, value=args.sample_batch_size),
-						gr.Number(label="Gradio Concurrency Count", precision=0, value=args.concurrency_count),
-						gr.Number(label="Auto-Calculate Voice Chunk Duration (in seconds)", precision=0, value=args.autocalculate_voice_chunk_duration_size),
-						gr.Slider(label="Output Volume", minimum=0, maximum=2, value=args.output_volume),
-					]
+					EXEC_SETTINGS['sample_batch_size'] = gr.Number(label="Sample Batch Size", precision=0, value=args.sample_batch_size)
+					EXEC_SETTINGS['concurrency_count'] = gr.Number(label="Gradio Concurrency Count", precision=0, value=args.concurrency_count)
+					EXEC_SETTINGS['autocalculate_voice_chunk_duration_size'] = gr.Number(label="Auto-Calculate Voice Chunk Duration (in seconds)", precision=0, value=args.autocalculate_voice_chunk_duration_size)
+					EXEC_SETTINGS['output_volume'] = gr.Slider(label="Output Volume", minimum=0, maximum=2, value=args.output_volume)
 					
-					autoregressive_model_dropdown = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
+					EXEC_SETTINGS['autoregressive_model'] = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
 					
-					vocoder_models = gr.Dropdown(VOCODERS, label="Vocoder", value=args.vocoder_model if args.vocoder_model else VOCODERS[-1])
-					whisper_backend = gr.Dropdown(WHISPER_BACKENDS, label="Whisper Backends", value=args.whisper_backend)
-					whisper_model_dropdown = gr.Dropdown(WHISPER_MODELS, label="Whisper Model", value=args.whisper_model)
+					EXEC_SETTINGS['vocoder_model'] = gr.Dropdown(VOCODERS, label="Vocoder", value=args.vocoder_model if args.vocoder_model else VOCODERS[-1])
+					EXEC_SETTINGS['whisper_backend'] = gr.Dropdown(WHISPER_BACKENDS, label="Whisper Backends", value=args.whisper_backend)
+					EXEC_SETTINGS['whisper_model'] = gr.Dropdown(WHISPER_MODELS, label="Whisper Model", value=args.whisper_model)
 					
-					exec_inputs = exec_inputs + [ autoregressive_model_dropdown, vocoder_models, whisper_backend, whisper_model_dropdown, training_halfp, training_bnb ]
+					EXEC_SETTINGS['training_default_halfp'] = TRAINING_SETTINGS['half_p']
+					EXEC_SETTINGS['training_default_bnb'] = TRAINING_SETTINGS['bitsandbytes']
 
 					with gr.Row():
 						autoregressive_models_update_button = gr.Button(value="Refresh Model List")
 						gr.Button(value="Check for Updates").click(check_for_updates)
 						gr.Button(value="(Re)Load TTS").click(
 							reload_tts,
-							inputs=autoregressive_model_dropdown,
+							inputs=EXEC_SETTINGS['autoregressive_model'],
 							outputs=None
 						)
 						# kill_button = gr.Button(value="Close UI")
@@ -648,48 +495,25 @@ def setup_gradio():
 
 					autoregressive_models_update_button.click(
 						update_model_list_proxy,
-						inputs=autoregressive_model_dropdown,
-						outputs=autoregressive_model_dropdown,
+						inputs=EXEC_SETTINGS['autoregressive_model'],
+						outputs=EXEC_SETTINGS['autoregressive_model'],
 					)
 
-				for i in exec_inputs:
-					i.change( fn=update_args, inputs=exec_inputs )
+				exec_inputs = list(EXEC_SETTINGS.values())
+				for k in EXEC_SETTINGS:
+					EXEC_SETTINGS[k].change( fn=update_args_proxy, inputs=exec_inputs )
 				
-				autoregressive_model_dropdown.change(
+				EXEC_SETTINGS['autoregressive_model'].change(
 					fn=update_autoregressive_model,
-					inputs=autoregressive_model_dropdown,
+					inputs=EXEC_SETTINGS['autoregressive_model'],
 					outputs=None
 				)
 
-				vocoder_models.change(
+				EXEC_SETTINGS['vocoder_model'].change(
 					fn=update_vocoder_model,
-					inputs=vocoder_models,
+					inputs=EXEC_SETTINGS['vocoder_model'],
 					outputs=None
 				)
-
-		input_settings = [
-			text,
-			delimiter,
-			emotion,
-			prompt,
-			voice,
-			mic_audio,
-			voice_latents_chunks,
-			seed,
-			candidates,
-			num_autoregressive_samples,
-			diffusion_iterations,
-			temperature,
-			diffusion_sampler,
-			breathing_room,
-			cvvp_weight,
-			top_p,
-			diffusion_temperature,
-			length_penalty,
-			repetition_penalty,
-			cond_free_k,
-			experimental_checkboxes,
-		]
 
 		history_voices.change(
 			fn=history_view_results,
@@ -734,45 +558,46 @@ def setup_gradio():
 		preset.change(fn=update_presets,
 			inputs=preset,
 			outputs=[
-				num_autoregressive_samples,
-				diffusion_iterations,
+				GENERATE_SETTINGS['num_autoregressive_samples'],
+				GENERATE_SETTINGS['diffusion_iterations'],
 			],
 		)
 
 		recompute_voice_latents.click(compute_latents_proxy,
 			inputs=[
-				voice,
-				voice_latents_chunks,
+				GENERATE_SETTINGS['voice'],
+				GENERATE_SETTINGS['voice_latents_chunks'],
 			],
-			outputs=voice,
+			outputs=GENERATE_SETTINGS['voice'],
 		)
 		
-		emotion.change(
+		GENERATE_SETTINGS['emotion'].change(
 			fn=lambda value: gr.update(visible=value == "Custom"),
-			inputs=emotion,
-			outputs=prompt
+			inputs=GENERATE_SETTINGS['emotion'],
+			outputs=GENERATE_SETTINGS['prompt']
 		)
-		mic_audio.change(fn=lambda value: gr.update(value="microphone"),
-			inputs=mic_audio,
-			outputs=voice
+		GENERATE_SETTINGS['mic_audio'].change(fn=lambda value: gr.update(value="microphone"),
+			inputs=GENERATE_SETTINGS['mic_audio'],
+			outputs=GENERATE_SETTINGS['voice']
 		)
 
 		refresh_voices.click(update_voices,
 			inputs=None,
 			outputs=[
-				voice,
+				GENERATE_SETTINGS['voice'],
 				dataset_settings[0],
 				history_voices
 			]
 		)
 
+		generate_settings = list(GENERATE_SETTINGS.values())
 		submit.click(
 			lambda: (gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)),
 			outputs=[source_sample, candidates_list, generation_results],
 		)
 
-		submit_event = submit.click(run_generation,
-			inputs=input_settings,
+		submit_event = submit.click(generate_proxy,
+			inputs=generate_settings,
 			outputs=[output_audio, source_sample, candidates_list, generation_results],
 			api_name="generate",
 		)
@@ -780,13 +605,13 @@ def setup_gradio():
 
 		copy_button.click(import_generate_settings,
 			inputs=audio_in, # JSON elements cannot be used as inputs
-			outputs=input_settings
+			outputs=generate_settings
 		)
 
 		reset_generation_settings_button.click(
 			fn=reset_generation_settings,
 			inputs=None,
-			outputs=input_settings
+			outputs=generate_settings
 		)
 
 		history_copy_settings_button.click(history_copy_settings,
@@ -794,7 +619,7 @@ def setup_gradio():
 				history_voices,
 				history_results_list,
 			],
-			outputs=input_settings
+			outputs=generate_settings
 		)
 
 		refresh_configs.click(
@@ -806,7 +631,6 @@ def setup_gradio():
 			inputs=[
 				training_configs,
 				verbose_training,
-				training_gpu_count,
 				training_keep_x_past_datasets,
 			],
 			outputs=[
@@ -855,38 +679,28 @@ def setup_gradio():
 			],
 			outputs=prepare_dataset_output #console_output
 		)
-		refresh_dataset_list.click(
+		
+		training_refresh_dataset.click(
 			lambda: gr.update(choices=get_dataset_list()),
 			inputs=None,
-			outputs=dataset_list_dropdown,
+			outputs=TRAINING_SETTINGS["voice"],
 		)
-		optimize_yaml_button.click(optimize_training_settings_proxy,
+		training_settings = list(TRAINING_SETTINGS.values())
+		training_optimize_configuration.click(optimize_training_settings_proxy,
 			inputs=training_settings,
-			outputs=training_settings[1:10] + [save_yaml_output] #console_output
+			outputs=training_settings[:-1] + [training_configuration_output] #console_output
 		)
-		import_dataset_button.click(import_training_settings_proxy,
-			inputs=dataset_list_dropdown,
-			outputs=training_settings[:14] + [save_yaml_output] #console_output
+		training_import_settings.click(import_training_settings_proxy,
+			inputs=TRAINING_SETTINGS['voice'],
+			outputs=training_settings[:-1] + [training_configuration_output] #console_output
 		)
-		save_yaml_button.click(save_training_settings_proxy,
+		training_save_configuration.click(save_training_settings_proxy,
 			inputs=training_settings,
-			outputs=save_yaml_output #console_output
+			outputs=training_configuration_output #console_output
 		)
-
-		"""
-		def kill_process():
-			ui.close()
-			exit()
-
-		kill_button.click(
-			kill_process,
-			inputs=None,
-			outputs=None
-		)
-		"""
 
 		if os.path.isfile('./config/generate.json'):
-			ui.load(import_generate_settings, inputs=None, outputs=input_settings)
+			ui.load(import_generate_settings, inputs=None, outputs=generate_settings)
 		
 		if args.check_for_updates:
 			ui.load(check_for_updates)
