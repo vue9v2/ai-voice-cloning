@@ -1539,10 +1539,10 @@ def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
 	additionals = sorted([f'{dir}/{d}' for d in os.listdir(dir) if d[-4:] == ".pth" ])
 	found = []
 	for training in os.listdir(f'./training/'):
-		if not os.path.isdir(f'./training/{training}/') or not os.path.isdir(f'./training/{training}/finetunes/') or not os.path.isdir(f'./training/{training}/finetunes/models/'):
+		if not os.path.isdir(f'./training/{training}/') or not os.path.isdir(f'./training/{training}/finetune/') or not os.path.isdir(f'./training/{training}/finetune/models/'):
 			continue
-		models = sorted([ int(d[:-8]) for d in os.listdir(f'./training/{training}/finetunes/models/') if d[-8:] == "_gpt.pth" ])
-		found = found + [ f'./training/{training}/finetunes/models/{d}_gpt.pth' for d in models ]
+		models = sorted([ int(d[:-8]) for d in os.listdir(f'./training/{training}/finetune/models/') if d[-8:] == "_gpt.pth" ])
+		found = found + [ f'./training/{training}/finetune/models/{d}_gpt.pth' for d in models ]
 
 	if len(found) > 0 or len(additionals) > 0:
 		base = ["auto"] + base
