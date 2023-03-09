@@ -34,7 +34,7 @@ from datetime import timedelta
 from tortoise.api import TextToSpeech, MODELS, get_model_path, pad_or_truncate
 from tortoise.utils.audio import load_audio, load_voice, load_voices, get_voice_dir
 from tortoise.utils.text import split_and_recombine_text
-from tortoise.utils.device import get_device_name, set_device_name, get_device_count
+from tortoise.utils.device import get_device_name, set_device_name, get_device_count, get_device_vram
 
 MODELS['dvae.pth'] = "https://huggingface.co/jbetker/tortoise-tts-v2/resolve/3704aea61678e7e468a06d8eea121dba368a798e/.models/dvae.pth"
 
@@ -1278,6 +1278,8 @@ def optimize_training_settings( **kwargs ):
 
 		messages.append(f"Batch size is not evenly divisible by the gradient accumulation size, adjusting gradient accumulation size to: {settings['gradient_accumulation_size']}")
 
+	print("VRAM", get_device_vram())
+
 	iterations = calc_iterations(epochs=settings['epochs'], lines=lines, batch_size=settings['batch_size'])
 
 	if settings['epochs'] < settings['print_rate']:
@@ -1306,7 +1308,7 @@ def optimize_training_settings( **kwargs ):
 		else:
 			messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
 			if not os.path.exists(get_halfp_model_path()):
-				convert_to_halfp()	
+				convert_to_halfp()
 
 	messages.append(f"For {settings['epochs']} epochs with {lines} lines in batches of {settings['batch_size']}, iterating for {iterations} steps ({int(iterations / settings['epochs'])} steps per epoch)")
 
@@ -1828,10 +1830,12 @@ def import_generate_settings(file="./config/generate.json"):
 	res = []
 	if GENERATE_SETTINGS_ARGS is not None:
 		for k in GENERATE_SETTINGS_ARGS:
-			res.append(defaults[k] if not settings or settings[k] is None else settings[k])
+			if k not in defaults:
+				continue
+			res.append(defaults[k] if not settings or k not in settings or not settings[k] is None else settings[k])
 	else:
 		for k in defaults:
-			res.append(defaults[k] if not settings or settings[k] is None else settings[k])
+			res.append(defaults[k] if not settings or k not in settings or not settings[k] is None else settings[k])
 
 	return tuple(res)
 
