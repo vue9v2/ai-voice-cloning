@@ -27,6 +27,7 @@ GENERATE_SETTINGS = {}
 TRANSCRIBE_SETTINGS = {}
 EXEC_SETTINGS = {}
 TRAINING_SETTINGS = {}
+GENERATE_SETTINGS_ARGS = []
 
 PRESETS = {
 	'Ultra Fast': {'num_autoregressive_samples': 16, 'diffusion_iterations': 30, 'cond_free': False},
@@ -144,6 +145,18 @@ def history_view_results( voice ):
 		gr.Dropdown.update(choices=sorted(files))
 	)
 
+def import_generate_settings_proxy( file=None ):
+	global GENERATE_SETTINGS_ARGS
+	settings = import_generate_settings( file )
+
+	res = []
+	for k in GENERATE_SETTINGS_ARGS:
+		res.append(settings[k] if k in settings else None)
+	print(GENERATE_SETTINGS_ARGS)
+	print(settings)
+	print(res)
+	return tuple(res)
+
 def compute_latents_proxy(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
 	compute_latents( voice=voice, voice_latents_chunks=voice_latents_chunks, progress=progress )
 	return voice
@@ -221,7 +234,10 @@ def import_training_settings_proxy( voice ):
 		if k not in settings:
 			continue
 		output[k] = settings[k]
+
 	output = list(output.values())
+	print(list(TRAINING_SETTINGS.keys()))
+	print(output)
 	messages.append(f"Imported training settings: {injson}")
 
 	return output[:-1] + ["\n".join(messages)]
@@ -250,7 +266,7 @@ def history_copy_settings( voice, file ):
 def setup_gradio():
 	global args
 	global ui
-	
+
 	if not args.share:
 		def noop(function, return_value=None):
 			def wrapped(*args, **kwargs):
@@ -273,6 +289,7 @@ def setup_gradio():
 	autoregressive_models = get_autoregressive_models()
 	dataset_list = get_dataset_list()
 
+	global GENERATE_SETTINGS_ARGS
 	GENERATE_SETTINGS_ARGS = list(inspect.signature(generate_proxy).parameters.keys())[:-1]
 	for i in range(len(GENERATE_SETTINGS_ARGS)):
 		arg = GENERATE_SETTINGS_ARGS[i]
@@ -639,7 +656,7 @@ def setup_gradio():
 		)
 
 
-		copy_button.click(import_generate_settings,
+		copy_button.click(import_generate_settings_proxy,
 			inputs=audio_in, # JSON elements cannot be used as inputs
 			outputs=generate_settings
 		)
@@ -738,7 +755,7 @@ def setup_gradio():
 		)
 
 		if os.path.isfile('./config/generate.json'):
-			ui.load(import_generate_settings, inputs=None, outputs=generate_settings)
+			ui.load(import_generate_settings_proxy, inputs=None, outputs=generate_settings)
 		
 		if args.check_for_updates:
 			ui.load(check_for_updates)

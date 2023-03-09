@@ -1274,6 +1274,15 @@ def optimize_training_settings( **kwargs ):
 			if vram > (k-1):
 				return v
 		return 1
+
+	if settings['gpus'] > get_device_count():
+		settings['gpus'] = get_device_count()
+		messages.append(f"GPU count exceeds defacto GPU count, clamping to: {settings['gpus']}")
+
+	if settings['gpus'] <= 1:
+		settings['gpus'] = 1
+	else:
+		messages.append(f"! EXPERIMENTAL ! Multi-GPU training is extremely particular, expect issues.")
 	
 	# assuming you have equal GPUs
 	vram = get_device_vram() * settings['gpus']
@@ -1303,14 +1312,14 @@ def optimize_training_settings( **kwargs ):
 		messages.append("Resume path specified, but does not exist. Disabling...")
 
 	if settings['bitsandbytes']:
-		messages.append("BitsAndBytes requested. Please note this is ! EXPERIMENTAL !")
+		messages.append("! EXPERIMENTAL ! BitsAndBytes requested.")
 
 	if settings['half_p']:
 		if settings['bitsandbytes']:
 			settings['half_p'] = False
 			messages.append("Half Precision requested, but BitsAndBytes is also requested. Due to redundancies, disabling half precision...")
 		else:
-			messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
+			messages.append("! EXPERIMENTAL ! Half Precision requested.")
 			if not os.path.exists(get_halfp_model_path()):
 				convert_to_halfp()	
 
@@ -1343,11 +1352,20 @@ def save_training_settings( **kwargs ):
 	settings['iterations'] = calc_iterations(epochs=settings['epochs'], lines=lines, batch_size=settings['batch_size'])
 	messages.append(f"For {settings['epochs']} epochs with {lines} lines, iterating for {settings['iterations']} steps")
 
-	iterations_per_epoch = int(settings['iterations'] / settings['epochs'])
+	iterations_per_epoch = settings['iterations'] / settings['epochs']
 
 	settings['print_rate'] = int(settings['print_rate'] * iterations_per_epoch)
 	settings['save_rate'] = int(settings['save_rate'] * iterations_per_epoch)
 	settings['validation_rate'] = int(settings['validation_rate'] * iterations_per_epoch)
+
+	iterations_per_epoch = int(iterations_per_epoch)
+	
+	if settings['print_rate'] < 1:
+		settings['print_rate'] = 1
+	if settings['save_rate'] < 1:
+		settings['save_rate'] = 1
+	if settings['validation_rate'] < 1:
+		settings['validation_rate'] = 1
 
 	settings['validation_batch_size'] = int(settings['batch_size'] / settings['gradient_accumulation_size'])
 
@@ -1809,9 +1827,7 @@ def save_args_settings():
 
 # super kludgy )`;
 def import_generate_settings(file="./config/generate.json"):
-	global GENERATE_SETTINGS_ARGS
-
-	defaults = {
+	res = {
 		'text': None,
 		'delimiter': None,
 		'emotion': None,
@@ -1836,19 +1852,9 @@ def import_generate_settings(file="./config/generate.json"):
 	}
 
 	settings, _ = read_generate_settings(file, read_latents=False)
-	
-	res = []
-	if GENERATE_SETTINGS_ARGS is not None:
-		for k in GENERATE_SETTINGS_ARGS:
-			if k not in defaults:
-				continue
-			res.append(defaults[k] if not settings or k not in settings or not settings[k] is None else settings[k])
-	else:
-		for k in defaults:
-			res.append(defaults[k] if not settings or k not in settings or not settings[k] is None else settings[k])
-
-	return tuple(res)
-
+	if settings is not None:
+		res.update(settings)
+	return res
 
 def reset_generation_settings():
 	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
@@ -1978,7 +1984,8 @@ def deduce_autoregressive_model(voice=None):
 		if os.path.isdir(dir):
 			counts = sorted([ int(d[:-8]) for d in os.listdir(dir) if d[-8:] == "_gpt.pth" ])
 			names = [ f'{dir}/{d}_gpt.pth' for d in counts ]
-			return names[-1]
+			if len(names) > 0:
+				return names[-1]
 
 	if args.autoregressive_model != "auto":
 		return args.autoregressive_model
