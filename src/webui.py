@@ -171,8 +171,14 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 		gr.update(visible=j is not None),
 	)
 
-def prepare_dataset_proxy( voice, language, skip_existings, progress=gr.Progress(track_tqdm=True) ):
-	return prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, progress=progress )
+def prepare_dataset_proxy( voice, language, validation_size, skip_existings, progress=gr.Progress(track_tqdm=True) ):
+	messages = []
+	message = prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, progress=progress )
+	messages.append(message)
+	if validation_size > 0:
+		message = prepare_validation_dataset( voice, text_length=validation_size )
+		messages.append(message)
+	return "\n".join(messages)
 
 def update_args_proxy( *args ):
 	kwargs = {}
@@ -377,14 +383,18 @@ def setup_gradio():
 			with gr.Tab("Prepare Dataset"):
 				with gr.Row():
 					with gr.Column():
-						dataset_settings = [
-							gr.Dropdown( choices=voice_list, label="Dataset Source", type="value", value=voice_list[0] if len(voice_list) > 0 else "" ),
-							gr.Textbox(label="Language", value="en"),
-							gr.Checkbox(label="Skip Already Transcribed", value=False)
-						]
-						transcribe_button = gr.Button(value="Transcribe")
-						validation_text_cull_size = gr.Number(label="Validation Text Length Cull Size", value=12, precision=0)
-						prepare_validation_button = gr.Button(value="Prepare Validation")
+						DATASET_SETTINGS = {}
+						DATASET_SETTINGS['voice'] = gr.Dropdown( choices=voice_list, label="Dataset Source", type="value", value=voice_list[0] if len(voice_list) > 0 else "" )
+						with gr.Row():
+							DATASET_SETTINGS['language'] = gr.Textbox(label="Language", value="en")
+							DATASET_SETTINGS['validation_size'] = gr.Number(label="Validation Text Length Cull Size", value=12, precision=0)
+						DATASET_SETTINGS['skip'] = gr.Checkbox(label="Skip Already Transcribed", value=False)
+
+						with gr.Row():
+							transcribe_button = gr.Button(value="Transcribe")
+							prepare_validation_button = gr.Button(value="Prepare Validation")
+
+						dataset_settings = list(DATASET_SETTINGS.values())
 					with gr.Column():
 						prepare_dataset_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 			with gr.Tab("Generate Configuration"):
@@ -692,7 +702,7 @@ def setup_gradio():
 			prepare_validation_dataset,
 			inputs=[
 				dataset_settings[0],
-				validation_text_cull_size,
+				DATASET_SETTINGS['validation_size'],
 			],
 			outputs=prepare_dataset_output #console_output
 		)
