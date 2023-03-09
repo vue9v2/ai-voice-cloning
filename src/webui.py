@@ -277,7 +277,6 @@ def setup_gradio():
 	for i in range(len(GENERATE_SETTINGS_ARGS)):
 		arg = GENERATE_SETTINGS_ARGS[i]
 		GENERATE_SETTINGS[arg] = None
-	set_generate_settings_arg_order(GENERATE_SETTINGS_ARGS)
 
 	with gr.Blocks() as ui:
 		with gr.Tab("Generate"):
@@ -402,11 +401,23 @@ def setup_gradio():
 					with gr.Column():
 						TRAINING_SETTINGS["epochs"] = gr.Number(label="Epochs", value=500, precision=0)
 						with gr.Row():
-							with gr.Column():
-								TRAINING_SETTINGS["learning_rate"] = gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6)
-								TRAINING_SETTINGS["text_ce_lr_weight"] = gr.Slider(label="Text_CE LR Ratio", value=0.01, minimum=0, maximum=1)
+							TRAINING_SETTINGS["learning_rate"] = gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6)
+							TRAINING_SETTINGS["text_ce_lr_weight"] = gr.Slider(label="Text_CE LR Ratio", value=0.01, minimum=0, maximum=1)
 							
-							TRAINING_SETTINGS["learning_rate_schedule"] = gr.Textbox(label="Learning Rate Schedule", placeholder=str(EPOCH_SCHEDULE))
+						with gr.Row():
+							lr_schemes = list(LEARNING_RATE_SCHEMES.keys())
+							TRAINING_SETTINGS["learning_rate_scheme"] = gr.Radio(lr_schemes, label="Learning Rate Scheme", value=lr_schemes[0], type="value")
+							TRAINING_SETTINGS["learning_rate_schedule"] = gr.Textbox(label="Learning Rate Schedule", placeholder=str(LEARNING_RATE_SCHEDULE), visible=True)
+							TRAINING_SETTINGS["learning_rate_restarts"] = gr.Number(label="Learning Rate Restarts", value=4, precision=0, visible=False)
+
+							TRAINING_SETTINGS["learning_rate_scheme"].change(
+								fn=lambda x: ( gr.update(visible=x == lr_schemes[0]), gr.update(visible=x == lr_schemes[1]) ),
+								inputs=TRAINING_SETTINGS["learning_rate_scheme"],
+								outputs=[
+									TRAINING_SETTINGS["learning_rate_schedule"],
+									TRAINING_SETTINGS["learning_rate_restarts"],
+								]
+							)
 						with gr.Row():
 							TRAINING_SETTINGS["batch_size"] = gr.Number(label="Batch Size", value=128, precision=0)
 							TRAINING_SETTINGS["gradient_accumulation_size"] = gr.Number(label="Gradient Accumulation Size", value=4, precision=0)
