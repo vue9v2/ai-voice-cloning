@@ -1257,10 +1257,11 @@ def optimize_training_settings( **kwargs ):
 		settings['batch_size'] = lines
 		messages.append(f"Batch size is larger than your dataset, clamping batch size to: {settings['batch_size']}")	
 
-	if settings['batch_size'] % lines != 0:
-		nearest_slice = int(lines / settings['batch_size']) + 1
-		settings['batch_size'] = int(lines / nearest_slice)
-		messages.append(f"Batch size not neatly divisible by dataset size, adjusting batch size to: {settings['batch_size']} ({nearest_slice} steps per epoch)")
+	if lines % settings['batch_size'] != 0:
+		settings['batch_size'] = int(lines / settings['batch_size'])
+		if settings['batch_size'] == 0:
+			settings['batch_size'] = 1
+		messages.append(f"Batch size not neatly divisible by dataset size, adjusting batch size to: {settings['batch_size']}")
 	
 	if settings['gradient_accumulation_size'] == 0:
 		settings['gradient_accumulation_size'] = 1
@@ -1271,6 +1272,7 @@ def optimize_training_settings( **kwargs ):
 			settings['gradient_accumulation_size'] = 1
 
 		messages.append(f"Gradient accumulation size is too large for a given batch size, clamping gradient accumulation size to: {settings['gradient_accumulation_size']}")
+	"""
 	elif settings['batch_size'] % settings['gradient_accumulation_size'] != 0:
 		settings['gradient_accumulation_size'] = int(settings['batch_size'] / settings['gradient_accumulation_size'])
 		if settings['gradient_accumulation_size'] == 0:
@@ -1278,7 +1280,34 @@ def optimize_training_settings( **kwargs ):
 
 		messages.append(f"Batch size is not evenly divisible by the gradient accumulation size, adjusting gradient accumulation size to: {settings['gradient_accumulation_size']}")
 
-	print("VRAM", get_device_vram())
+	if settings['batch_size'] % settings['gpus'] != 0:
+		settings['batch_size'] = int(settings['batch_size'] / settings['gpus'])
+		if settings['batch_size'] == 0:
+			settings['batch_size'] = 1
+		messages.append(f"Batch size not neatly divisible by GPU count, adjusting batch size to: {settings['batch_size']}")
+	"""
+
+
+	def get_device_batch_size( vram ):
+		DEVICE_BATCH_SIZE_MAP = [
+			(32, 64), # based on my two 6800XTs, I can only really safely get a ratio of 156:2 = 78
+			(16, 8), # based on an A4000, I can do a ratio of 512:64 = 8:1
+			(8, 4), # interpolated
+			(6, 2), # based on my 2060, it only really lets me have a batch ratio of 2:1
+		]
+		for k, v in DEVICE_BATCH_SIZE_MAP:
+			if vram > (k-1):
+				return v
+		return 1
+	
+	# assuming you have equal GPUs
+	vram = get_device_vram() * settings['gpus']
+	batch_ratio = int(settings['batch_size'] / settings['gradient_accumulation_size'])
+	batch_cap = get_device_batch_size(vram)
+
+	if batch_ratio > batch_cap:
+		settings['gradient_accumulation_size'] = int(settings['batch_size'] / batch_cap)
+		messages.append(f"Batch ratio ({batch_ratio}) is expected to exceed your VRAM capacity ({'{:.3f}'.format(vram)}GB, suggested {batch_cap} batch size cap), adjusting gradient accumulation size to: {settings['gradient_accumulation_size']}")
 
 	iterations = calc_iterations(epochs=settings['epochs'], lines=lines, batch_size=settings['batch_size'])
 
@@ -1308,7 +1337,7 @@ def optimize_training_settings( **kwargs ):
 		else:
 			messages.append("Half Precision requested. Please note this is ! EXPERIMENTAL !")
 			if not os.path.exists(get_halfp_model_path()):
-				convert_to_halfp()
+				convert_to_halfp()	
 
 	messages.append(f"For {settings['epochs']} epochs with {lines} lines in batches of {settings['batch_size']}, iterating for {iterations} steps ({int(iterations / settings['epochs'])} steps per epoch)")
 
@@ -1365,10 +1394,6 @@ def save_training_settings( **kwargs ):
 
 	if settings['gpus'] > get_device_count():
 		settings['gpus'] = get_device_count()
-	if settings['gpus'] < 1:
-		settings['gpus'] = 1
-
-	settings['optimizer'] = 'adamw' if settings['gpus'] == 1 else 'adamw_zero'
 
 	LEARNING_RATE_SCHEMES = ["MultiStepLR", "CosineAnnealingLR_Restart"]
 	if 'learning_rate_scheme' not in settings or settings['learning_rate_scheme'] not in LEARNING_RATE_SCHEMES:
@@ -1830,12 +1855,10 @@ def import_generate_settings(file="./config/generate.json"):
 	res = []
 	if GENERATE_SETTINGS_ARGS is not None:
 		for k in GENERATE_SETTINGS_ARGS:
-			if k not in defaults:
-				continue
-			res.append(defaults[k] if not settings or k not in settings or not settings[k] is None else settings[k])
+			res.append(defaults[k] if not settings or settings[k] is None else settings[k])
 	else:
 		for k in defaults:
-			res.append(defaults[k] if not settings or k not in settings or not settings[k] is None else settings[k])
+			res.append(defaults[k] if not settings or settings[k] is None else settings[k])
 
 	return tuple(res)
 
