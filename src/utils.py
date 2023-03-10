@@ -1440,11 +1440,11 @@ def save_training_settings( **kwargs ):
 	settings['learning_rate_scheme'] = "\n".join(learning_rate_schema)
 
 	if settings['resume_state']:
-		settings['source_model'] = f"# pretrain_model_gpt: {settings['source_model']}"
-		settings['resume_state'] = f"resume_state: {settings['resume_state']}'"
+		settings['source_model'] = f"# pretrain_model_gpt: '{settings['source_model']}'"
+		settings['resume_state'] = f"resume_state: '{settings['resume_state']}'"
 	else:
-		settings['source_model'] = f"pretrain_model_gpt: {settings['source_model']}"
-		settings['resume_state'] = f"# resume_state: {settings['resume_state']}'"
+		settings['source_model'] = f"pretrain_model_gpt: '{settings['source_model']}'"
+		settings['resume_state'] = f"# resume_state: '{settings['resume_state']}'"
 
 	with open(f'./models/.template.yaml', 'r', encoding="utf-8") as f:
 		yaml = f.read()
