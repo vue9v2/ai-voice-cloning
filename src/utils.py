@@ -1857,11 +1857,6 @@ def import_generate_settings(file="./config/generate.json"):
 		res.update(settings)
 	return res
 
-def reset_generation_settings():
-	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
-		f.write(json.dumps({}, indent='\t') )
-	return import_generate_settings()
-
 def read_generate_settings(file, read_latents=True):
 	j = None
 	latents = None

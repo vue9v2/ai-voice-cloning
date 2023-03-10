@@ -152,10 +152,13 @@ def import_generate_settings_proxy( file=None ):
 	res = []
 	for k in GENERATE_SETTINGS_ARGS:
 		res.append(settings[k] if k in settings else None)
-	print(GENERATE_SETTINGS_ARGS)
-	print(settings)
-	print(res)
+
 	return tuple(res)
+
+def reset_generation_settings_proxy():
+	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
+		f.write(json.dumps({}, indent='\t') )
+	return import_generate_settings_proxy()
 
 def compute_latents_proxy(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
 	compute_latents( voice=voice, voice_latents_chunks=voice_latents_chunks, progress=progress )
@@ -662,7 +665,7 @@ def setup_gradio():
 		)
 
 		reset_generation_settings_button.click(
-			fn=reset_generation_settings,
+			fn=reset_generation_settings_proxy,
 			inputs=None,
 			outputs=generate_settings
 		)
