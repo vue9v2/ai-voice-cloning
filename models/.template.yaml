@@ -1,4 +1,4 @@
-name: ${voice}
+name: '${voice}'
 model: extensibletrainer
 scale: 1
 gpu_ids: [0] # Superfluous, redundant, unnecessary, the way you launch the training script will set this
