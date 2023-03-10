@@ -18,6 +18,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-opt', type=str, help='Path to option YAML file.', default='../options/train_vit_latent.yml', nargs='+') # ugh
     parser.add_argument('--launcher', choices=['none', 'pytorch'], default='none', help='job launcher')
+    parser.add_argument('--mode', type=str, default='none', help='mode')
     args = parser.parse_args()
     args.opt = " ".join(args.opt) # absolutely disgusting
     
@@ -77,7 +78,7 @@ def train(yaml, launcher='none'):
         trainer.rank = torch.distributed.get_rank()
         torch.cuda.set_device(torch.distributed.get_rank())
 
-    trainer.init(yaml, opt, launcher)
+    trainer.init(yaml, opt, launcher, '')
     trainer.do_training()
 
 if __name__ == "__main__":

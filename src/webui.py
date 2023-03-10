@@ -152,13 +152,10 @@ def import_generate_settings_proxy( file=None ):
 	res = []
 	for k in GENERATE_SETTINGS_ARGS:
 		res.append(settings[k] if k in settings else None)
-
+	print(GENERATE_SETTINGS_ARGS)
+	print(settings)
+	print(res)
 	return tuple(res)
-
-def reset_generation_settings_proxy():
-	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
-		f.write(json.dumps({}, indent='\t') )
-	return import_generate_settings_proxy()
 
 def compute_latents_proxy(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
 	compute_latents( voice=voice, voice_latents_chunks=voice_latents_chunks, progress=progress )
@@ -442,7 +439,6 @@ def setup_gradio():
 							TRAINING_SETTINGS["batch_size"] = gr.Number(label="Batch Size", value=128, precision=0)
 							TRAINING_SETTINGS["gradient_accumulation_size"] = gr.Number(label="Gradient Accumulation Size", value=4, precision=0)
 						with gr.Row():
-							TRAINING_SETTINGS["print_rate"] = gr.Number(label="Print Frequency (in epochs)", value=5, precision=0)
 							TRAINING_SETTINGS["save_rate"] = gr.Number(label="Save Frequency (in epochs)", value=5, precision=0)
 							TRAINING_SETTINGS["validation_rate"] = gr.Number(label="Validation Frequency (in epochs)", value=5, precision=0)
 
@@ -665,7 +661,7 @@ def setup_gradio():
 		)
 
 		reset_generation_settings_button.click(
-			fn=reset_generation_settings_proxy,
+			fn=reset_generation_settings,
 			inputs=None,
 			outputs=generate_settings
 		)
