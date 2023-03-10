@@ -14,8 +14,8 @@ python3 -m pip install -r ./modules/tortoise-tts/requirements.txt # install TorT
 python3 -m pip install -e ./modules/tortoise-tts/ # install TorToiSe
 python3 -m pip install -r ./modules/dlas/requirements.txt # instal DLAS requirements, last, because whisperx will break a dependency here
 
-python3 -m pip install -U -r einops==0.6.0
-python3 -m pip install -U -r librosa==0.8.1
+python3 -m pip install -U einops==0.6.0
+python3 -m pip install -U librosa==0.8.1
 
 rm *.bat
 
