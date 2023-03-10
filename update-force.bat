@@ -7,9 +7,11 @@ call .\venv\Scripts\activate.bat
 
 python -m pip install --upgrade pip
 python -m pip install -U -r .\requirements.txt
-python -m pip install --force-reinstall -U -r .\modules\tortoise-tts\requirements.txt
-python -m pip install --force-reinstall -U -e .\modules\tortoise-tts 
-python -m pip install --force-reinstall -U -r .\modules\dlas\requirements.txt
+python -m pip install -U -r .\modules\tortoise-tts\requirements.txt
+python -m pip install -U -e .\modules\tortoise-tts 
+python -m pip install -U -r .\modules\dlas\requirements.txt
+python -m pip install -U -r einops==0.6.0
+python -m pip install -U -r librosa==0.8.1
 
 pause
 deactivate
