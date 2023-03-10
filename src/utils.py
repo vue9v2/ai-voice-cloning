@@ -707,8 +707,9 @@ class TrainingState():
 			
 		models = sorted([ int(d[:-8]) for d in os.listdir(f'{self.dataset_dir}/models/') if d[-8:] == "_gpt.pth" ])
 		states = sorted([ int(d[:-6]) for d in os.listdir(f'{self.dataset_dir}/training_state/') if d[-6:] == ".state" ])
-		remove_models = models[:-2]
-		remove_states = states[:-2]
+
+		remove_models = models[:-keep]
+		remove_states = states[:-keep]
 
 		for d in remove_models:
 			path = f'{self.dataset_dir}/models/{d}_gpt.pth'
