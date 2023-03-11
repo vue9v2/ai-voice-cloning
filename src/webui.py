@@ -218,9 +218,19 @@ def import_training_settings_proxy( voice ):
 	messages = []
 	injson = f'./training/{voice}/train.json'
 	statedir = f'./training/{voice}/finetune/training_state/'
+	output = {}
 
-	with open(injson, 'r', encoding="utf-8") as f:
-		settings = json.loads(f.read())
+	try:
+		with open(injson, 'r', encoding="utf-8") as f:
+			settings = json.loads(f.read())
+	except:
+		messages.append(f"Error import /{voice}/train.json")
+
+		for k in TRAINING_SETTINGS:
+			output[k] = TRAINING_SETTINGS[k].value
+
+		output = list(output.values())
+		return output[:-1] + ["\n".join(messages)]
 
 	if os.path.isdir(statedir):
 		resumes = sorted([int(d[:-6]) for d in os.listdir(statedir) if d[-6:] == ".state" ])
