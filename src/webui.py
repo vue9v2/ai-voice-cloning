@@ -422,8 +422,9 @@ def setup_gradio():
 							DATASET_SETTINGS['skip'] = gr.Checkbox(label="Skip Already Transcribed", value=False)
 							DATASET_SETTINGS['slice'] = gr.Checkbox(label="Slice Segments", value=False)
 
+						transcribe_button = gr.Button(value="Transcribe and Process")
+						
 						with gr.Row():
-							transcribe_button = gr.Button(value="Transcribe")
 							slice_dataset_button = gr.Button(value="(Re)Slice Audio")
 							prepare_dataset_button = gr.Button(value="(Re)Create Dataset")
 
