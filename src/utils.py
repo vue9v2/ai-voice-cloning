@@ -543,7 +543,7 @@ def compute_latents(voice=None, voice_samples=None, voice_latents_chunks=0, prog
 				with open(dataset_path, 'r', encoding="utf-8") as f:
 					lines = f.readlines()
 
-				print("Leveraging LJSpeech dataset for computing latents")
+				print("Leveraging dataset for computing latents")
 
 				voice_samples = []
 				max_length = 0
@@ -558,6 +558,9 @@ def compute_latents(voice=None, voice_samples=None, voice_latents_chunks=0, prog
 					voice_samples[i] = pad_or_truncate(voice_samples[i], max_length)
 
 				voice_latents_chunks = len(voice_samples)
+				if voice_latents_chunks == 0:
+					print("Dataset is empty!")
+					load_from_dataset = True
 		if not load_from_dataset:
 			voice_samples, _ = load_voice(voice, load_latents=False)
 
