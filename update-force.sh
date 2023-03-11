@@ -9,11 +9,9 @@ python3 -m venv venv
 source ./venv/bin/activate
 
 python3 -m pip install --upgrade pip
-python3 -m pip install -r ./requirements.txt
 python3 -m pip install -r ./modules/tortoise-tts/requirements.txt
 python3 -m pip install -e ./modules/tortoise-tts 
 python3 -m pip install -r ./modules/dlas/requirements.txt
-python3 -m pip install -U einops==0.6.0
-python3 -m pip install -U librosa==0.8.1
+python3 -m pip install -r ./requirements.txt
 
 deactivate
