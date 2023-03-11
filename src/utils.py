@@ -1122,6 +1122,11 @@ def slice_dataset( voice, start_offset=0, end_offset=0 ):
 			start = int((segment['start'] + start_offset) * sampling_rate)
 			end = int((segment['end'] + end_offset) * sampling_rate)
 
+			if start < 0:
+				start = 0
+			if end >= waveform.shape[-1]:
+				end = waveform.shape[-1] - 1
+
 			sliced = waveform[:, start:end]
 			file = filename.replace(".wav", f"_{pad(segment['id'], 4)}.wav")
 
