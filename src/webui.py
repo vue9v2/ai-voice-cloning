@@ -184,8 +184,11 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 
 def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, progress=gr.Progress(track_tqdm=True) ):
 	messages = []
-	message = prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, slice_audio=slice_audio, progress=progress )
+	message = prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, progress=progress )
 	messages.append(message)
+	if slice_audio:
+		message = slice_dataset( voice )
+		messages.append(message)
 	if validation_text_length > 0 or validation_audio_length > 0:
 		message = prepare_validation_dataset( voice, text_length=validation_text_length, audio_length=validation_audio_length )
 		messages.append(message)
@@ -418,7 +421,8 @@ def setup_gradio():
 
 						with gr.Row():
 							transcribe_button = gr.Button(value="Transcribe")
-							prepare_validation_button = gr.Button(value="Prepare Validation")
+							prepare_validation_button = gr.Button(value="(Re)Create Validation Dataset")
+							slice_dataset_button = gr.Button(value="(Re)Slice Audio")
 
 						with gr.Row():
 							EXEC_SETTINGS['whisper_backend'] = gr.Dropdown(WHISPER_BACKENDS, label="Whisper Backends", value=args.whisper_backend)
@@ -746,6 +750,13 @@ def setup_gradio():
 				DATASET_SETTINGS['validation_audio_length'],
 			],
 			outputs=prepare_dataset_output #console_output
+		)
+		slice_dataset_button.click(
+			slice_dataset,
+			inputs=[
+				dataset_settings[0]
+			],
+			outputs=prepare_dataset_output
 		)
 		
 		training_refresh_dataset.click(

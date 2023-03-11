@@ -1051,7 +1051,56 @@ def whisper_transcribe( file, language=None ):
 			result['segments'].append(reparsed)
 		return result
 
-def prepare_dataset( files, outdir, language=None, skip_existings=False, slice_audio=False, progress=None ):
+def validate_waveform( waveform, sample_rate ):
+	if not torch.any(waveform < 0):
+		return False
+
+	if waveform.shape[-1] < (.6 * sample_rate):
+		return False
+	return True
+
+def slice_dataset( voice, start_offset=0, end_offset=0 ):
+	indir = f'./training/{voice}/'
+	infile = f'{indir}/whisper.json'
+
+	if not os.path.exists(infile):
+		raise Exception(f"Missing dataset: {infile}")
+
+	with open(infile, 'r', encoding="utf-8") as f:
+		results = json.load(f)
+
+	transcription = []
+	for filename in results:
+		idx = 0
+		result = results[filename]
+		waveform, sampling_rate = torchaudio.load(f'./voices/{voice}/{filename}')
+
+		for segment in result['segments']: # enumerate_progress(result['segments'], desc="Segmenting voice file", progress=progress):
+			start = int((segment['start'] + start_offset) * sampling_rate)
+			end = int((segment['end'] + end_offset) * sampling_rate)
+
+			sliced_waveform = waveform[:, start:end]
+			sliced_name = filename.replace(".wav", f"_{pad(idx, 4)}.wav")
+
+			if not validate_waveform( sliced_waveform, sampling_rate ):
+				print(f"Invalid waveform segment ({segment['start']}:{segment['end']}): {sliced_name}, skipping...")
+				continue
+
+			torchaudio.save(f"{indir}/audio/{sliced_name}", sliced_waveform, sampling_rate)
+
+			idx = idx + 1
+			line = f"audio/{sliced_name}|{segment['text'].strip()}"
+			transcription.append(line)
+			with open(f'{indir}/train.txt', 'a', encoding="utf-8") as f:
+				f.write(f'\n{line}')
+
+	joined = "\n".join(transcription)
+	with open(f'{indir}/train.txt', 'w', encoding="utf-8") as f:
+		f.write(joined)
+
+	return f"Processed dataset to: {indir}\n{joined}"
+
+def prepare_dataset( files, outdir, language=None, skip_existings=False, progress=None ):
 	unload_tts()
 
 	global whisper_model
@@ -1079,13 +1128,6 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, slice_a
 			if match[0] not in previous_list:
 				previous_list.append(f'{match[0].split("/")[-1]}.wav')
 
-	def validate_waveform( waveform, sample_rate ):
-		if not torch.any(waveform < 0):
-			return False
-
-		if waveform.shape[-1] < (.6 * sampling_rate):
-			return False
-		return True
 
 	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
 		basename = os.path.basename(file)
@@ -1099,38 +1141,16 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, slice_a
 		print(f"Transcribed file: {file}, {len(result['segments'])} found.")
 
 		waveform, sampling_rate = torchaudio.load(file)
-		num_channels, num_frames = waveform.shape
 
-		if not slice_audio:
-			if not validate_waveform( waveform, sampling_rate ):
-				print(f"Invalid waveform: {basename}, skipping...")
-				continue
+		if not validate_waveform( waveform, sampling_rate ):
+			print(f"Invalid waveform: {basename}, skipping...")
+			continue
 
-			torchaudio.save(f"{outdir}/audio/{basename}", waveform, sampling_rate)
-			line = f"audio/{basename}|{result['text'].strip()}"
-			transcription.append(line)
-			with open(f'{outdir}/train.txt', 'a', encoding="utf-8") as f:
-				f.write(f'\n{line}')
-		else:
-			idx = 0
-			for segment in result['segments']: # enumerate_progress(result['segments'], desc="Segmenting voice file", progress=progress):
-				start = int(segment['start'] * sampling_rate)
-				end = int(segment['end'] * sampling_rate)
-
-				sliced_waveform = waveform[:, start:end]
-				sliced_name = basename.replace(".wav", f"_{pad(idx, 4)}.wav")
-
-				if not validate_waveform( sliced_waveform, sampling_rate ):
-					print(f"Invalid waveform segment ({segment['start']}:{segment['end']}): {sliced_name}, skipping...")
-					continue
-
-				torchaudio.save(f"{outdir}/audio/{sliced_name}", sliced_waveform, sampling_rate)
-
-				idx = idx + 1
-				line = f"audio/{sliced_name}|{segment['text'].strip()}"
-				transcription.append(line)
-				with open(f'{outdir}/train.txt', 'a', encoding="utf-8") as f:
-					f.write(f'\n{line}')
+		torchaudio.save(f"{outdir}/audio/{basename}", waveform, sampling_rate)
+		line = f"audio/{basename}|{result['text'].strip()}"
+		transcription.append(line)
+		with open(f'{outdir}/train.txt', 'a', encoding="utf-8") as f:
+			f.write(f'\n{line}')
 
 		do_gc()
 	
