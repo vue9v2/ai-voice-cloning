@@ -50,20 +50,18 @@ import torch
 import datetime
 from codes import train as tr
 from utils import util, options as option
+from torch.distributed.run import main
 
 # this is effectively just copy pasted and cleaned up from the __main__ section of training.py
 # I'll clean it up better
 
 def train(yaml, launcher='none'):
     opt = option.parse(yaml, is_train=True)
-    if launcher != 'none':
-        # export CUDA_VISIBLE_DEVICES for running in distributed mode.
-        if 'gpu_ids' in opt.keys():
-            gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
-            os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
-            print('export CUDA_VISIBLE_DEVICES=' + gpu_list)
-    trainer = tr.Trainer()
 
+    if launcher == 'none' and opt['gpus'] > 1:
+        return main([f"--nproc_per_node={opt['gpus']}", "--master_port=1234", "./src/train.py", "-opt", yaml, "--launcher=pytorch"])
+
+    trainer = tr.Trainer()
     #### distributed training settings
     if launcher == 'none':  # disabled distributed training
         opt['dist'] = False
@@ -82,13 +80,12 @@ def train(yaml, launcher='none'):
     trainer.do_training()
 
 if __name__ == "__main__":
-    # simple check because I'm brain damaged and forgot I can't modify what a module exports by simply changing the booleans that decide what it exports after the fact
     try:
         import torch_intermediary
         if torch_intermediary.OVERRIDE_ADAM:
-            print("Using BitsAndBytes ADAMW optimizations")
+            print("Using BitsAndBytes optimizations")
         else:
-            print("NOT using BitsAndBytes ADAMW optimizations")
+            print("NOT using BitsAndBytes optimizations")
     except Exception as e:
         pass
 

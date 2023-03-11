@@ -640,7 +640,7 @@ class TrainingState():
 			self.spawn_process(config_path=config_path, gpus=gpus)
 
 	def spawn_process(self, config_path, gpus=1):
-		self.cmd = ['train.bat', config_path] if os.name == "nt" else ['./train.sh', str(int(gpus)), config_path]
+		self.cmd = ['train.bat', config_path] if os.name == "nt" else ['./train.sh', config_path]
 
 		print("Spawning process: ", " ".join(self.cmd))
 		self.process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
@@ -671,8 +671,8 @@ class TrainingState():
 			self.it_rate = f'{"{:.3f}".format(1/it_rate)}it/s' if 0 < it_rate and it_rate < 1 else f'{"{:.3f}".format(it_rate)}s/it'
 			self.it_rates += it_rate
 
-			self.eta = (self.its - self.it) * (self.it_rates / self.its)
 			try:
+				self.eta = (self.its - self.it) * (self.it_rates / self.it)
 				eta = str(timedelta(seconds=int(self.eta)))
 				self.eta_hhmmss = eta
 			except Exception as e:
@@ -1218,20 +1218,18 @@ def optimize_training_settings( **kwargs ):
 			settings['gradient_accumulation_size'] = 1
 
 		messages.append(f"Gradient accumulation size is too large for a given batch size, clamping gradient accumulation size to: {settings['gradient_accumulation_size']}")
-	"""
 	elif settings['batch_size'] % settings['gradient_accumulation_size'] != 0:
-		settings['gradient_accumulation_size'] = int(settings['batch_size'] / settings['gradient_accumulation_size'])
+		settings['gradient_accumulation_size'] -= settings['batch_size'] % settings['gradient_accumulation_size']
 		if settings['gradient_accumulation_size'] == 0:
 			settings['gradient_accumulation_size'] = 1
 
 		messages.append(f"Batch size is not evenly divisible by the gradient accumulation size, adjusting gradient accumulation size to: {settings['gradient_accumulation_size']}")
 
 	if settings['batch_size'] % settings['gpus'] != 0:
-		settings['batch_size'] = int(settings['batch_size'] / settings['gpus'])
+		settings['batch_size'] -= settings['batch_size'] % settings['gpus']
 		if settings['batch_size'] == 0:
 			settings['batch_size'] = 1
 		messages.append(f"Batch size not neatly divisible by GPU count, adjusting batch size to: {settings['batch_size']}")
-	"""
 
 
 	def get_device_batch_size( vram ):
@@ -1254,7 +1252,7 @@ def optimize_training_settings( **kwargs ):
 		settings['gpus'] = 1
 	else:
 		messages.append(f"! EXPERIMENTAL ! Multi-GPU training is extremely particular, expect issues.")
-	
+
 	# assuming you have equal GPUs
 	vram = get_device_vram() * settings['gpus']
 	batch_ratio = int(settings['batch_size'] / settings['gradient_accumulation_size'])
