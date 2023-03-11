@@ -152,9 +152,7 @@ def import_generate_settings_proxy( file=None ):
 	res = []
 	for k in GENERATE_SETTINGS_ARGS:
 		res.append(settings[k] if k in settings else None)
-	print(GENERATE_SETTINGS_ARGS)
-	print(settings)
-	print(res)
+
 	return tuple(res)
 
 def compute_latents_proxy(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
@@ -184,12 +182,12 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 		gr.update(visible=j is not None),
 	)
 
-def prepare_dataset_proxy( voice, language, validation_size, skip_existings, progress=gr.Progress(track_tqdm=True) ):
+def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, progress=gr.Progress(track_tqdm=True) ):
 	messages = []
-	message = prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, progress=progress )
+	message = prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, slice_audio=slice_audio, progress=progress )
 	messages.append(message)
-	if validation_size > 0:
-		message = prepare_validation_dataset( voice, text_length=validation_size )
+	if validation_text_length > 0 or validation_audio_length > 0:
+		message = prepare_validation_dataset( voice, text_length=validation_text_length, audio_length=validation_audio_length )
 		messages.append(message)
 	return "\n".join(messages)
 
@@ -246,8 +244,7 @@ def import_training_settings_proxy( voice ):
 		output[k] = settings[k]
 
 	output = list(output.values())
-	print(list(TRAINING_SETTINGS.keys()))
-	print(output)
+
 	messages.append(f"Imported training settings: {injson}")
 
 	return output[:-1] + ["\n".join(messages)]
@@ -413,12 +410,19 @@ def setup_gradio():
 						DATASET_SETTINGS['voice'] = gr.Dropdown( choices=voice_list, label="Dataset Source", type="value", value=voice_list[0] if len(voice_list) > 0 else "" )
 						with gr.Row():
 							DATASET_SETTINGS['language'] = gr.Textbox(label="Language", value="en")
-							DATASET_SETTINGS['validation_size'] = gr.Number(label="Validation Text Length Cull Size", value=12, precision=0)
-						DATASET_SETTINGS['skip'] = gr.Checkbox(label="Skip Already Transcribed", value=False)
+							DATASET_SETTINGS['validation_text_length'] = gr.Number(label="Validation Text Length Threshold", value=12, precision=0)
+							DATASET_SETTINGS['validation_audio_length'] = gr.Number(label="Validation Audio Length Threshold", value=1 )
+						with gr.Row():
+							DATASET_SETTINGS['skip'] = gr.Checkbox(label="Skip Already Transcribed", value=False)
+							DATASET_SETTINGS['slice'] = gr.Checkbox(label="Slice Segments", value=False)
 
 						with gr.Row():
 							transcribe_button = gr.Button(value="Transcribe")
 							prepare_validation_button = gr.Button(value="Prepare Validation")
+
+						with gr.Row():
+							EXEC_SETTINGS['whisper_backend'] = gr.Dropdown(WHISPER_BACKENDS, label="Whisper Backends", value=args.whisper_backend)
+							EXEC_SETTINGS['whisper_model'] = gr.Dropdown(WHISPER_MODELS, label="Whisper Model", value=args.whisper_model)
 
 						dataset_settings = list(DATASET_SETTINGS.values())
 					with gr.Column():
@@ -533,8 +537,7 @@ def setup_gradio():
 					EXEC_SETTINGS['autoregressive_model'] = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
 					
 					EXEC_SETTINGS['vocoder_model'] = gr.Dropdown(VOCODERS, label="Vocoder", value=args.vocoder_model if args.vocoder_model else VOCODERS[-1])
-					EXEC_SETTINGS['whisper_backend'] = gr.Dropdown(WHISPER_BACKENDS, label="Whisper Backends", value=args.whisper_backend)
-					EXEC_SETTINGS['whisper_model'] = gr.Dropdown(WHISPER_MODELS, label="Whisper Model", value=args.whisper_model)
+					
 					
 					EXEC_SETTINGS['training_default_halfp'] = TRAINING_SETTINGS['half_p']
 					EXEC_SETTINGS['training_default_bnb'] = TRAINING_SETTINGS['bitsandbytes']
@@ -739,7 +742,8 @@ def setup_gradio():
 			prepare_validation_dataset,
 			inputs=[
 				dataset_settings[0],
-				DATASET_SETTINGS['validation_size'],
+				DATASET_SETTINGS['validation_text_length'],
+				DATASET_SETTINGS['validation_audio_length'],
 			],
 			outputs=prepare_dataset_output #console_output
 		)
