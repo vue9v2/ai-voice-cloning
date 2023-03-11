@@ -39,9 +39,9 @@ from tortoise.utils.device import get_device_name, set_device_name, get_device_c
 
 MODELS['dvae.pth'] = "https://huggingface.co/jbetker/tortoise-tts-v2/resolve/3704aea61678e7e468a06d8eea121dba368a798e/.models/dvae.pth"
 
-WHISPER_MODELS = ["tiny", "base", "small", "medium", "large", "large-v2"]
+WHISPER_MODELS = ["tiny", "base", "small", "medium", "large"]
 WHISPER_SPECIALIZED_MODELS = ["tiny.en", "base.en", "small.en", "medium.en"]
-WHISPER_BACKENDS = ["openai/whisper", "lightmare/whispercpp", "m-bain/whisperx"]
+WHISPER_BACKENDS = ["openai/whisper", "lightmare/whispercpp"]
 VOCODERS = ['univnet', 'bigvgan_base_24khz_100band', 'bigvgan_24khz_100band']
 
 GENERATE_SETTINGS_ARGS = None
@@ -1032,7 +1032,7 @@ def whisper_transcribe( file, language=None ):
 
 		return whisper_model.transcribe(file, language=language)
 
-	elif args.whisper_backend == "lightmare/whispercpp":
+	if args.whisper_backend == "lightmare/whispercpp":
 		res = whisper_model.transcribe(file)
 		segments = whisper_model.extract_text_and_timestamps( res )
 
@@ -1046,23 +1046,6 @@ def whisper_transcribe( file, language=None ):
 				'text': segment[2],
 			}
 			result['segments'].append(reparsed)
-
-		return result
-
-	# credit to https://git.ecker.tech/yqxtqymn for the busywork of getting this added
-	elif args.whisper_backend == "m-bain/whisperx":
-		import whisperx
-		device = "cuda" if get_device_name() == "cuda" else "cpu"
-		result = whisper_model.transcribe(file)
-		model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
-		result_aligned = whisperx.align(result["segments"], model_a, metadata, file, device)
-
-		for i in range(len(result_aligned['segments'])):
-			del result_aligned['segments'][i]['word-segments']
-			del result_aligned['segments'][i]['char-segments']
-
-		result['segments'] = result_aligned['segments']
-
 		return result
 
 def prepare_dataset( files, outdir, language=None, skip_existings=False, slice_audio=False, progress=None ):
@@ -1071,9 +1054,6 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, slice_a
 	global whisper_model
 	if whisper_model is None:
 		load_whisper_model(language=language)
-
-	if args.whisper_backend == "m-bain/whisperx" and slice_audio:
-		print("! CAUTION ! Slicing audio with whisperx is terrible. Please consider using a different whisper backend if you want to slice audio.")
 
 	os.makedirs(f'{outdir}/audio/', exist_ok=True)
 
@@ -1708,7 +1688,7 @@ def setup_args():
 	parser.add_argument("--output-volume", type=float, default=default_arguments['output-volume'], help="Adjusts volume of output")
 	
 	parser.add_argument("--autoregressive-model", default=default_arguments['autoregressive-model'], help="Specifies which autoregressive model to use for sampling.")
-	parser.add_argument("--whisper-backend", default=default_arguments['whisper-backend'], action='store_true', help="Picks which whisper backend to use (openai/whisper, lightmare/whispercpp, m-bain/whisperx)")
+	parser.add_argument("--whisper-backend", default=default_arguments['whisper-backend'], action='store_true', help="Picks which whisper backend to use (openai/whisper, lightmare/whispercpp)")
 	parser.add_argument("--whisper-model", default=default_arguments['whisper-model'], help="Specifies which whisper model to use for transcription.")
 	
 	parser.add_argument("--training-default-halfp", action='store_true', default=default_arguments['training-default-halfp'], help="Training default: halfp")
@@ -2069,12 +2049,13 @@ def unload_voicefixer():
 def load_whisper_model(language=None, model_name=None, progress=None):
 	global whisper_model
 
+	if model_name == "m-bain/whisperx":
+		print("WhisperX has been removed. Reverting to openai/whisper. Apologies for the inconvenience.")
+		model_name = "openai/whisper"
+
 	if args.whisper_backend not in WHISPER_BACKENDS:
 		raise Exception(f"unavailable backend: {args.whisper_backend}")
 
-	if args.whisper_backend != "m-bain/whisperx" and model_name == "large-v2":
-		raise Exception("large-v2 is only available for m-bain/whisperx backend")
-	
 	if not model_name:
 		model_name = args.whisper_model
 	else:
@@ -2097,10 +2078,6 @@ def load_whisper_model(language=None, model_name=None, progress=None):
 
 		b_lang = language.encode('ascii')
 		whisper_model = Whisper(model_name, models_dir='./models/', language=b_lang)
-	elif args.whisper_backend == "m-bain/whisperx":
-		import whisperx
-		device = "cuda" if get_device_name() == "cuda" else "cpu"
-		whisper_model = whisperx.load_model(model_name, device)
 
 	print("Loaded Whisper model")
 
