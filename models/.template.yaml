@@ -7,8 +7,6 @@ checkpointing_enabled: true
 fp16: ${half_p}
 bitsandbytes: ${bitsandbytes}
 gpus: ${gpus}
-wandb: false 
-use_tb_logger: true
 
 datasets:
   train:
@@ -135,8 +133,7 @@ eval:
   output_state: gen
 
 logger: 
-  print_freq: ${print_rate}
   save_checkpoint_freq: ${save_rate}
   visuals: [gen, mel]
-  visual_debug_rate: ${print_rate}
+  visual_debug_rate: ${save_rate}
   is_mel_spectrogram: true
