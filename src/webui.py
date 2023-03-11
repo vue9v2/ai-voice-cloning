@@ -182,14 +182,14 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 		gr.update(visible=j is not None),
 	)
 
-def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=False) ):
+def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, trim_silence, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=False) ):
 	messages = []
 	
 	message = transcribe_dataset( voice=voice, language=language, skip_existings=skip_existings, progress=progress )
 	messages.append(message)
 
 	if slice_audio:
-		message = slice_dataset( voice, start_offset=slice_start_offset, end_offset=slice_end_offset )
+		message = slice_dataset( voice, trim_silence=trim_silence, start_offset=slice_start_offset, end_offset=slice_end_offset )
 		messages.append(message)
 
 	message = prepare_dataset( voice, use_segments=slice_audio, text_length=validation_text_length, audio_length=validation_audio_length )
@@ -421,6 +421,7 @@ def setup_gradio():
 						with gr.Row():
 							DATASET_SETTINGS['skip'] = gr.Checkbox(label="Skip Already Transcribed", value=False)
 							DATASET_SETTINGS['slice'] = gr.Checkbox(label="Slice Segments", value=False)
+							DATASET_SETTINGS['trim_silence'] = gr.Checkbox(label="Trim Silence", value=False)
 						with gr.Row():
 							DATASET_SETTINGS['slice_start_offset'] = gr.Number(label="Slice Start Offset", value=0)
 							DATASET_SETTINGS['slice_end_offset'] = gr.Number(label="Slice End Offset", value=0)
@@ -763,6 +764,7 @@ def setup_gradio():
 			slice_dataset,
 			inputs=[
 				DATASET_SETTINGS['voice'],
+				DATASET_SETTINGS['trim_silence'],
 				DATASET_SETTINGS['slice_start_offset'],
 				DATASET_SETTINGS['slice_end_offset'],
 			],

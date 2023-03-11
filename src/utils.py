@@ -1100,7 +1100,7 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 
 	return f"Processed dataset to: {indir}"
 
-def slice_dataset( voice, start_offset=0, end_offset=0 ):
+def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0 ):
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
 
@@ -1133,6 +1133,9 @@ def slice_dataset( voice, start_offset=0, end_offset=0 ):
 			if not validate_waveform( sliced, sampling_rate ):
 				print(f"Invalid waveform segment ({segment['start']}:{segment['end']}): {file}, skipping...")
 				continue
+
+			if trim_silence:
+				sliced = torchaudio.functional.vad( sliced, sampling_rate )
 
 			torchaudio.save(f"{indir}/audio/{file}", sliced, sampling_rate)
 
