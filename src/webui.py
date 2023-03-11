@@ -182,16 +182,19 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 		gr.update(visible=j is not None),
 	)
 
-def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, progress=gr.Progress(track_tqdm=True) ):
+def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, progress=gr.Progress(track_tqdm=False) ):
 	messages = []
-	message = prepare_dataset( get_voices(load_latents=False)[voice], outdir=f"./training/{voice}/", language=language, skip_existings=skip_existings, progress=progress )
+	
+	message = transcribe_dataset( voice=voice, language=language, skip_existings=skip_existings, progress=progress )
 	messages.append(message)
+
 	if slice_audio:
 		message = slice_dataset( voice )
 		messages.append(message)
-	if validation_text_length > 0 or validation_audio_length > 0:
-		message = prepare_validation_dataset( voice, text_length=validation_text_length, audio_length=validation_audio_length )
-		messages.append(message)
+
+	message = prepare_dataset( voice, use_segments=slice_audio, text_length=validation_text_length, audio_length=validation_audio_length )
+	messages.append(message)
+
 	return "\n".join(messages)
 
 def update_args_proxy( *args ):
@@ -421,8 +424,8 @@ def setup_gradio():
 
 						with gr.Row():
 							transcribe_button = gr.Button(value="Transcribe")
-							prepare_validation_button = gr.Button(value="(Re)Create Validation Dataset")
 							slice_dataset_button = gr.Button(value="(Re)Slice Audio")
+							prepare_dataset_button = gr.Button(value="(Re)Create Dataset")
 
 						with gr.Row():
 							EXEC_SETTINGS['whisper_backend'] = gr.Dropdown(WHISPER_BACKENDS, label="Whisper Backends", value=args.whisper_backend)
@@ -654,7 +657,7 @@ def setup_gradio():
 			inputs=None,
 			outputs=[
 				GENERATE_SETTINGS['voice'],
-				dataset_settings[0],
+				DATASET_SETTINGS['voice'],
 				history_voices
 			]
 		)
@@ -742,10 +745,11 @@ def setup_gradio():
 			inputs=dataset_settings,
 			outputs=prepare_dataset_output #console_output
 		)
-		prepare_validation_button.click(
-			prepare_validation_dataset,
+		prepare_dataset_button.click(
+			prepare_dataset,
 			inputs=[
-				dataset_settings[0],
+				DATASET_SETTINGS['voice'],
+				DATASET_SETTINGS['slice'],
 				DATASET_SETTINGS['validation_text_length'],
 				DATASET_SETTINGS['validation_audio_length'],
 			],
@@ -754,7 +758,7 @@ def setup_gradio():
 		slice_dataset_button.click(
 			slice_dataset,
 			inputs=[
-				dataset_settings[0]
+				DATASET_SETTINGS['voice']
 			],
 			outputs=prepare_dataset_output
 		)
