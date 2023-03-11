@@ -1079,7 +1079,7 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, slice_a
 			if match[0] not in previous_list:
 				previous_list.append(f'{match[0].split("/")[-1]}.wav')
 
-	def validate_waveform( waveform, sample_rate, name ):
+	def validate_waveform( waveform, sample_rate ):
 		if not torch.any(waveform < 0):
 			return False
 
@@ -1102,8 +1102,8 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, slice_a
 		num_channels, num_frames = waveform.shape
 
 		if not slice_audio:
-			if not validate_waveform( waveform, sampling_rate, name ):
-				print(f"Segment invalid: {name}, skipping...")
+			if not validate_waveform( waveform, sampling_rate ):
+				print(f"Invalid waveform: {basename}, skipping...")
 				continue
 
 			torchaudio.save(f"{outdir}/audio/{basename}", waveform, sampling_rate)
@@ -1120,8 +1120,8 @@ def prepare_dataset( files, outdir, language=None, skip_existings=False, slice_a
 				sliced_waveform = waveform[:, start:end]
 				sliced_name = basename.replace(".wav", f"_{pad(idx, 4)}.wav")
 
-				if not validate_waveform( sliced_waveform, sampling_rate, sliced_name ):
-					print(f"Trimmed segment invalid: {sliced_name}, skipping...")
+				if not validate_waveform( sliced_waveform, sampling_rate ):
+					print(f"Invalid waveform segment ({segment['start']}:{segment['end']}): {sliced_name}, skipping...")
 					continue
 
 				torchaudio.save(f"{outdir}/audio/{sliced_name}", sliced_waveform, sampling_rate)
