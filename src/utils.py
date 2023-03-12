@@ -2065,7 +2065,13 @@ def load_whisper_model(language=None, model_name=None, progress=None):
 
 	if args.whisper_backend == "openai/whisper":
 		import whisper
-		whisper_model = whisper.load_model(model_name)
+		try:
+			#is it possible for model to fit on vram but go oom later on while executing on data?
+			whisper_model = whisper.load_model(model_name)
+		except:
+			print("Out of VRAM memory.")
+			print(f"Falling back to loading Whisper on CPU.")
+			whisper_model = whisper.load_model(model_name, device="cpu")
 	elif args.whisper_backend == "lightmare/whispercpp":
 		from whispercpp import Whisper
 		if not language:
