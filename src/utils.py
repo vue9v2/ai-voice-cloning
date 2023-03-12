@@ -1802,7 +1802,10 @@ def save_args_settings():
 		f.write(json.dumps(settings, indent='\t') )
 
 # super kludgy )`;
-def import_generate_settings(file="./config/generate.json"):
+def import_generate_settings(file = None):
+	if not file:
+		file = "./config/generate.json"
+
 	res = {
 		'text': None,
 		'delimiter': None,
@@ -1828,8 +1831,10 @@ def import_generate_settings(file="./config/generate.json"):
 	}
 
 	settings, _ = read_generate_settings(file, read_latents=False)
+
 	if settings is not None:
 		res.update(settings)
+	
 	return res
 
 def reset_generation_settings():

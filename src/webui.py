@@ -791,10 +791,8 @@ def setup_gradio():
 			outputs=training_configuration_output #console_output
 		)
 
-		#care: this overrides all the above specified default values
-		#specifically default voice not being null and empty prompt causing errors
-		#if os.path.isfile('./config/generate.json'):
-		#	ui.load(import_generate_settings_proxy, inputs=None, outputs=generate_settings)
+		if os.path.isfile('./config/generate.json'):
+			ui.load(import_generate_settings_proxy, inputs=None, outputs=generate_settings)
 		
 		if args.check_for_updates:
 			ui.load(check_for_updates)
