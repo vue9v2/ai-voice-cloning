@@ -497,7 +497,7 @@ def setup_gradio():
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
 						
-						training_keep_x_past_datasets = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
+						keep_x_past_checkpoints = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
 						with gr.Row():
 							start_training_button = gr.Button(value="Train")
 							stop_training_button = gr.Button(value="Stop")
@@ -708,7 +708,7 @@ def setup_gradio():
 			inputs=[
 				training_configs,
 				verbose_training,
-				training_keep_x_past_datasets,
+				keep_x_past_checkpoints,
 			],
 			outputs=[
 				training_output,
