@@ -879,6 +879,8 @@ class TrainingState():
 			elif line.find('INFO: Validation Metrics:') >= 0:
 				data = json.loads(line.split("INFO: Validation Metrics:")[-1])
 				data['mode'] = "validation"
+			else:
+				data = None
 
 			if data is not None:
 				if ': nan' in line and not self.nan_detected:
