@@ -510,7 +510,7 @@ def setup_gradio():
 							y="value",
 							title="Loss Metrics",
 							color="type",
-							tooltip=['epoch', 'value', 'type'],
+							tooltip=['epoch', 'it', 'value', 'type'],
 							width=500,
 							height=350,
 						)
@@ -519,7 +519,7 @@ def setup_gradio():
 							y="value",
 							title="Learning Rate",
 							color="type",
-							tooltip=['epoch', 'value', 'type'],
+							tooltip=['epoch', 'it', 'value', 'type'],
 							width=500,
 							height=350,
 						)
