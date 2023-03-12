@@ -301,6 +301,7 @@ def setup_gradio():
 	result_voices = get_voice_list("./results/")
 	autoregressive_models = get_autoregressive_models()
 	dataset_list = get_dataset_list()
+	training_list = get_training_list()
 
 	global GENERATE_SETTINGS_ARGS
 	GENERATE_SETTINGS_ARGS = list(inspect.signature(generate_proxy).parameters.keys())[:-1]
@@ -492,8 +493,7 @@ def setup_gradio():
 			with gr.Tab("Run Training"):
 				with gr.Row():
 					with gr.Column():
-						training_list = get_training_list()
-						training_configs = gr.Dropdown(label="Training Configuration", choices=training_list, value=training_list[0])
+						training_configs = gr.Dropdown(label="Training Configuration", choices=training_list, value=training_list[0] if len(training_list) else "")
 						refresh_configs = gr.Button(value="Refresh Configurations")
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)

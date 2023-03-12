@@ -35,7 +35,7 @@ from datetime import timedelta
 from tortoise.api import TextToSpeech, MODELS, get_model_path, pad_or_truncate
 from tortoise.utils.audio import load_audio, load_voice, load_voices, get_voice_dir, get_voices
 from tortoise.utils.text import split_and_recombine_text
-from tortoise.utils.device import get_device_name, set_device_name, get_device_count, get_device_vram
+from tortoise.utils.device import get_device_name, set_device_name, get_device_count, get_device_vram, do_gc
 
 MODELS['dvae.pth'] = "https://huggingface.co/jbetker/tortoise-tts-v2/resolve/3704aea61678e7e468a06d8eea121dba368a798e/.models/dvae.pth"
 
@@ -1546,13 +1546,6 @@ def get_dataset_list(dir="./training/"):
 
 def get_training_list(dir="./training/"):
 	return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
-
-def do_gc():
-	gc.collect()
-	try:
-		torch.cuda.empty_cache()
-	except Exception as e:
-		pass
 
 def pad(num, zeroes):
 	return str(num).zfill(zeroes+1)
