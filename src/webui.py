@@ -312,7 +312,7 @@ def setup_gradio():
 		with gr.Tab("Generate"):
 			with gr.Row():
 				with gr.Column():
-					GENERATE_SETTINGS["text"] = gr.Textbox(lines=4, label="Input Prompt")
+					GENERATE_SETTINGS["text"] = gr.Textbox(lines=4, value="Your prompt here.", label="Input Prompt")
 			with gr.Row():
 				with gr.Column():
 					GENERATE_SETTINGS["delimiter"] = gr.Textbox(lines=1, label="Line Delimiter", placeholder="\\n")
@@ -342,8 +342,8 @@ def setup_gradio():
 
 					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value" )
 
-					GENERATE_SETTINGS["num_autoregressive_samples"] = gr.Slider(value=128, minimum=2, maximum=512, step=1, label="Samples")
-					GENERATE_SETTINGS["diffusion_iterations"] = gr.Slider(value=128, minimum=0, maximum=512, step=1, label="Iterations")
+					GENERATE_SETTINGS["num_autoregressive_samples"] = gr.Slider(value=16, minimum=2, maximum=512, step=1, label="Samples")
+					GENERATE_SETTINGS["diffusion_iterations"] = gr.Slider(value=30, minimum=0, maximum=512, step=1, label="Iterations")
 
 					GENERATE_SETTINGS["temperature"] = gr.Slider(value=0.2, minimum=0, maximum=1, step=0.1, label="Temperature")
 					
@@ -492,7 +492,8 @@ def setup_gradio():
 			with gr.Tab("Run Training"):
 				with gr.Row():
 					with gr.Column():
-						training_configs = gr.Dropdown(label="Training Configuration", choices=get_training_list())
+						training_list = get_training_list()
+						training_configs = gr.Dropdown(label="Training Configuration", choices=training_list, value=training_list[0])
 						refresh_configs = gr.Button(value="Refresh Configurations")
 						training_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
@@ -790,8 +791,10 @@ def setup_gradio():
 			outputs=training_configuration_output #console_output
 		)
 
-		if os.path.isfile('./config/generate.json'):
-			ui.load(import_generate_settings_proxy, inputs=None, outputs=generate_settings)
+		#care: this overrides all the above specified default values
+		#specifically default voice not being null and empty prompt causing errors
+		#if os.path.isfile('./config/generate.json'):
+		#	ui.load(import_generate_settings_proxy, inputs=None, outputs=generate_settings)
 		
 		if args.check_for_updates:
 			ui.load(check_for_updates)
