@@ -616,6 +616,8 @@ class TrainingState():
 		
 		self.it_rate = ""
 		self.it_rates = 0
+		
+		self.epoch_rate = ""
 
 		self.eta = "?"
 		self.eta_hhmmss = "?"
@@ -674,6 +676,10 @@ class TrainingState():
 			self.it_rate = f'{"{:.3f}".format(1/it_rate)}it/s' if 0 < it_rate and it_rate < 1 else f'{"{:.3f}".format(it_rate)}s/it'
 			self.it_rates += it_rate
 
+			epoch_rate = self.it_rates / self.it * self.epoch
+			if epoch_rate > 0:
+				self.epoch_rate = f'{"{:.3f}".format(1/epoch_rate)}epoch/s' if 0 < epoch_rate and epoch_rate < 1 else f'{"{:.3f}".format(epoch_rate)}s/epoch'
+
 			try:
 				self.eta = (self.its - self.it) * (self.it_rates / self.it)
 				eta = str(timedelta(seconds=int(self.eta)))
@@ -689,16 +695,18 @@ class TrainingState():
 			self.metrics['step'].append(f"{self.step}/{self.steps}")
 		self.metrics['step'] = ", ".join(self.metrics['step'])
 
+		epoch = self.epoch + (self.step / self.steps)
 		if 'lr' in self.info:
-			self.statistics['lr'].append({'step': self.it, 'value': self.info['lr'], 'type': 'learning_rate'})
+			self.statistics['lr'].append({'epoch': epoch, 'value': self.info['lr'], 'type': 'learning_rate'})
 		
 		for k in ['loss_text_ce', 'loss_mel_ce', 'loss_gpt_total']:
 			if k not in self.info:
 				continue
 
-			self.statistics['loss'].append({'step': self.it, 'value': self.info[k], 'type': f'{"val_" if data["mode"] == "validation" else ""}{k}' })
 			if k == "loss_gpt_total":
 				self.losses.append( self.statistics['loss'][-1] )
+			else:
+				self.statistics['loss'].append({'epoch': epoch, 'value': self.info[k], 'type': f'{"val_" if data["mode"] == "validation" else ""}{k}' })
 
 		return data
 
@@ -807,24 +815,10 @@ class TrainingState():
 			if ': nan' in line and not self.nan_detected:
 				self.nan_detected = self.it
 
-			"""
-			if self.step == self.steps and self.steps > 0:
-				self.epoch_time_end = time.time()
-				self.epoch_time_delta = self.epoch_time_end-self.epoch_time_start
-				self.epoch_time_start = time.time()
-				try:
-					self.epoch_rate = f'{"{:.3f}".format(1/self.epoch_time_delta)}epoch/s' if 0 < self.epoch_time_delta and self.epoch_time_delta < 1 else f'{"{:.3f}".format(self.epoch_time_delta)}s/epoch'
-				except Exception as e:
-					pass
-			"""
-
 			self.metrics['rate'] = []
-			"""
 			if self.epoch_rate:
 				self.metrics['rate'].append(self.epoch_rate)
-			if self.it_rate and self.epoch_rate != self.it_rate:
-			"""
-			if self.it_rate:
+			if self.it_rate and self.epoch_rate[:-7] != self.it_rate[:-4]:
 				self.metrics['rate'].append(self.it_rate)
 			self.metrics['rate'] = ", ".join(self.metrics['rate'])
 
@@ -878,7 +872,7 @@ class TrainingState():
 
 			self.metrics['loss'] = ", ".join(self.metrics['loss'])
 
-			message = f"[{self.metrics['step']}] [{self.metrics['rate']}] [ETA: {eta_hhmmss}]\n[{self.metrics['loss']}]"
+			message = f"[{self.metrics['epoch']}] [{self.metrics['rate']}] [ETA: {eta_hhmmss}]\n[{self.metrics['loss']}]"
 			if self.nan_detected:
 				message = f"[!NaN DETECTED! {self.nan_detected}] {message}"
 
@@ -897,9 +891,6 @@ class TrainingState():
 		result = None
 		if should_return:
 			result = "".join(self.buffer) if not self.training_started else message
-
-		if keep_x_past_checkpoints > 0:
-			self.cleanup_old(keep=keep_x_past_checkpoints)
 
 		return (
 			result,
@@ -958,17 +949,17 @@ def update_training_dataplot(config_path=None):
 		if config_path:
 			training_state = TrainingState(config_path=config_path, start=False)
 			if len(training_state.statistics['loss']) > 0:
-				losses = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['loss']), x_lim=[0,training_state.its], x="step", y="value", title="Training Metrics", color="type", tooltip=['step', 'value', 'type'], width=500, height=350,)
+				losses = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['loss']), x_lim=[0,training_state.epochs], x="epoch", y="value", title="Loss Metrics", color="type", tooltip=['epoch', 'value', 'type'], width=500, height=350,)
 			if len(training_state.statistics['lr']) > 0:
-				lrs = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['lr']), x_lim=[0,training_state.its], x="step", y="value", title="Training Metrics", color="type", tooltip=['step', 'value', 'type'], width=500, height=350,)
+				lrs = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['lr']), x_lim=[0,training_state.epochs], x="epoch", y="value", title="Learning Rate", color="type", tooltip=['epoch', 'value', 'type'], width=500, height=350,)
 			del training_state
 			training_state = None
 	else:
 		training_state.load_statistics()
 		if len(training_state.statistics['loss']) > 0:
-			losses = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['loss']), x_lim=[0,training_state.its], x="step", y="value", title="Training Metrics", color="type", tooltip=['step', 'value', 'type'], width=500, height=350,)
+			losses = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['loss']), x_lim=[0,training_state.epochs], x="epoch", y="value", title="Loss Metrics", color="type", tooltip=['epoch', 'value', 'type'], width=500, height=350,)
 		if len(training_state.statistics['lr']) > 0:
-			lrs = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['lr']), x_lim=[0,training_state.its], x="step", y="value", title="Training Metrics", color="type", tooltip=['step', 'value', 'type'], width=500, height=350,)
+			lrs = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['lr']), x_lim=[0,training_state.epochs], x="epoch", y="value", title="Learning Rate", color="type", tooltip=['epoch', 'value', 'type'], width=500, height=350,)
 
 	return (losses, lrs)
 
@@ -1164,10 +1155,13 @@ def prepare_dataset( voice, use_segments, text_length, audio_length ):
 		for segment in segments:
 			text = segment['text'].strip()
 			file = filename.replace(".wav", f"_{pad(segment['id'], 4)}.wav") if use_segments else filename
+			path = f'{indir}/audio/{file}'
+			if not os.path.exists(path):
+				continue
 
 			culled = len(text) < text_length
 			if not culled and audio_length > 0:
-				metadata = torchaudio.info(f'{indir}/audio/{file}')
+				metadata = torchaudio.info(path)
 				duration = metadata.num_channels * metadata.num_frames / metadata.sample_rate
 				culled = duration < audio_length
 
@@ -2072,8 +2066,7 @@ def load_whisper_model(language=None, model_name=None, progress=None):
 			#is it possible for model to fit on vram but go oom later on while executing on data?
 			whisper_model = whisper.load_model(model_name)
 		except:
-			print("Out of VRAM memory.")
-			print(f"Falling back to loading Whisper on CPU.")
+			print("Out of VRAM memory. falling back to loading Whisper on CPU.")
 			whisper_model = whisper.load_model(model_name, device="cpu")
 	elif args.whisper_backend == "lightmare/whispercpp":
 		from whispercpp import Whisper
