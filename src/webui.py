@@ -506,20 +506,20 @@ def setup_gradio():
 						
 					with gr.Column():
 						training_loss_graph = gr.LinePlot(label="Training Metrics",
-							x="step",
+							x="epoch",
 							y="value",
-							title="Training Metrics",
+							title="Loss Metrics",
 							color="type",
-							tooltip=['step', 'value', 'type'],
+							tooltip=['epoch', 'value', 'type'],
 							width=500,
 							height=350,
 						)
 						training_lr_graph = gr.LinePlot(label="Training Metrics",
-							x="step",
+							x="epoch",
 							y="value",
-							title="Training Metrics",
+							title="Learning Rate",
 							color="type",
-							tooltip=['step', 'value', 'type'],
+							tooltip=['epoch', 'value', 'type'],
 							width=500,
 							height=350,
 						)
