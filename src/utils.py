@@ -819,8 +819,6 @@ class TrainingState():
 					continue
 
 				self.parse_metrics(data)
-				print(self.get_status())
-				# print(f"Iterations Left: {self.its - self.it} | Elapsed Time: {self.it_rates} | Time Remaining: {self.eta} | Message: {self.get_status()}")
 
 		self.last_info_check_at = highest_step
 
@@ -964,8 +962,6 @@ def update_training_dataplot(config_path=None):
 			training_state = TrainingState(config_path=config_path, start=False)
 			training_state.load_statistics()
 			message = training_state.get_status()
-			print(message)
-
 			if len(training_state.statistics['loss']) > 0:
 				losses = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['loss']), x_lim=[0,training_state.epochs], x="epoch", y="value", title="Loss Metrics", color="type", tooltip=['epoch', 'it', 'value', 'type'], width=500, height=350,)
 			if len(training_state.statistics['lr']) > 0:
@@ -973,7 +969,7 @@ def update_training_dataplot(config_path=None):
 			del training_state
 			training_state = None
 	else:
-		training_state.load_statistics()
+		# training_state.load_statistics()
 		if len(training_state.statistics['loss']) > 0:
 			losses = gr.LinePlot.update(value=pd.DataFrame(training_state.statistics['loss']), x_lim=[0,training_state.epochs], x="epoch", y="value", title="Loss Metrics", color="type", tooltip=['epoch', 'it', 'value', 'type'], width=500, height=350,)
 		if len(training_state.statistics['lr']) > 0:
