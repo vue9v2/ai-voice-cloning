@@ -1162,7 +1162,7 @@ def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0 ):
 			if trim_silence:
 				sliced = torchaudio.functional.vad( sliced, sample_rate )
 			
-			sliced, sample_rate = resample( sample_rate, 22050 )
+			sliced, sample_rate = resample( sliced, sample_rate, 22050 )
 			torchaudio.save(f"{indir}/audio/{file}", sliced, sample_rate)
 			
 			segments +=1
