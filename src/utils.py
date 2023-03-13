@@ -519,7 +519,7 @@ def update_baseline_for_latents_chunks( voice ):
 			continue
 
 		metadata = torchaudio.info(f'{path}/{file}')
-		duration = metadata.num_channels * metadata.num_frames / metadata.sample_rate
+		duration = metadata.num_frames / metadata.sample_rate
 		total_duration += duration
 		total = total + 1
 
@@ -1079,7 +1079,7 @@ def validate_waveform( waveform, sample_rate, min_only=False ):
 		return "Waveform is empty"
 
 	num_channels, num_frames = waveform.shape
-	duration = num_channels * num_frames / sample_rate
+	duration = num_frames / sample_rate
 	
 	if duration < MIN_TRAINING_DURATION:
 		return "Duration too short ({:.3f}s < {:.3f}s)".format(duration, MIN_TRAINING_DURATION)
@@ -1176,7 +1176,7 @@ def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0, resul
 		result = results[filename]
 		waveform, sample_rate = torchaudio.load(path)
 		num_channels, num_frames = waveform.shape
-		duration = num_channels * num_frames / sample_rate
+		duration = num_frames / sample_rate
 
 		for segment in result['segments']: 
 			file = filename.replace(".wav", f"_{pad(segment['id'], 4)}.wav")
@@ -1234,7 +1234,7 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=F
 				continue
 
 			metadata = torchaudio.info(path)
-			duration = metadata.num_channels * metadata.num_frames / metadata.sample_rate
+			duration = metadata.num_frames / metadata.sample_rate
 			if duration >= MAX_TRAINING_DURATION:
 				message = f"Audio too large, using segments: {filename}"
 				print(message)
@@ -1285,7 +1285,7 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=F
 			culled = len(text) < text_length
 			if not culled and audio_length > 0:
 				num_channels, num_frames = waveform.shape
-				duration = num_channels * num_frames / sample_rate
+				duration = num_frames / sample_rate
 				culled = duration < audio_length
 
 			# for when i add in a little treat ;), as it requires normalized text
