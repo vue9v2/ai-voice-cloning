@@ -1212,6 +1212,14 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 		result = results[filename]
 		use_segment = use_segments
 
+		# check if unsegmented text exceeds 200 characters
+		if not use_segment:
+			if len(result['text']) > 200:
+				message = f"Text length too long (200 < {len(text)}), using segments: {filename}"
+				print(message)
+				messages.append(message)
+				use_segment = True
+
 		# check if unsegmented audio exceeds 11.6s
 		if not use_segment:
 			path = f'{indir}/audio/{filename}'
@@ -1254,6 +1262,7 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 				message = f"Text length too long (200 < {len(text)}), skipping... {file}"
 				print(message)
 				messages.append(message)
+				continue
 
 			waveform, sample_rate = torchaudio.load(path)
 
@@ -1340,7 +1349,8 @@ def optimize_training_settings( **kwargs ):
 
 	def get_device_batch_size( vram ):
 		DEVICE_BATCH_SIZE_MAP = [
-			(32, 64), # based on my two 6800XTs, I can only really safely get a ratio of 156:2 = 78
+			(70, 128), # based on an A100-80G, I can safely get a ratio of 4096:32 = 128
+			(32, 64), # based on my two 6800XTs, I can only really safely get a ratio of 128:2 = 64
 			(16, 8), # based on an A4000, I can do a ratio of 512:64 = 8:1
 			(8, 4), # interpolated
 			(6, 2), # based on my 2060, it only really lets me have a batch ratio of 2:1

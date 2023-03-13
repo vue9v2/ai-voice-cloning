@@ -1,7 +1,7 @@
 name: '${voice}'
 model: extensibletrainer
 scale: 1
-gpu_ids: [0] # Superfluous, redundant, unnecessary, the way you launch the training script will set this
+gpu_ids: [0] # Manually edit this if the GPU you want to train on is not your primary, as this will set the env var that exposes CUDA devices
 start_step: 0
 checkpointing_enabled: true 
 fp16: ${half_p}
@@ -17,7 +17,7 @@ datasets:
     path: ${dataset_path}
     fetcher_mode: ['lj']
     phase: train
-    max_wav_length: 255995
+    max_wav_length: 255995 # ~11.6 seconds
     max_text_length: 200
     sample_rate: 22050
     load_conditioning: True
@@ -26,7 +26,7 @@ datasets:
     use_bpe_tokenizer: True
     tokenizer_vocab: ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
-  val: # I really do not care about validation right now
+  val:
     name: validation
     n_workers: ${workers}
     batch_size: ${validation_batch_size}
@@ -83,11 +83,11 @@ steps:
     losses:
       text_ce:
         type: direct
-        weight: ${text_ce_lr_weight}
+        weight: ${text_lr_weight}
         key: loss_text_ce
       mel_ce:
         type: direct
-        weight: 1
+        weight: ${mel_lr_weight}
         key: loss_mel_ce
 
 networks:

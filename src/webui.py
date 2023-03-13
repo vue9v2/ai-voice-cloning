@@ -446,7 +446,8 @@ def setup_gradio():
 						TRAINING_SETTINGS["epochs"] = gr.Number(label="Epochs", value=500, precision=0)
 						with gr.Row():
 							TRAINING_SETTINGS["learning_rate"] = gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6)
-							TRAINING_SETTINGS["text_ce_lr_weight"] = gr.Slider(label="Text_CE LR Ratio", value=0.01, minimum=0, maximum=1)
+							TRAINING_SETTINGS["mel_lr_weight"] = gr.Slider(label="Mel LR Ratio", value=1.00, minimum=0, maximum=1)
+							TRAINING_SETTINGS["text_lr_weight"] = gr.Slider(label="Text LR Ratio", value=0.01, minimum=0, maximum=1)
 							
 						with gr.Row():
 							lr_schemes = list(LEARNING_RATE_SCHEMES.keys())
