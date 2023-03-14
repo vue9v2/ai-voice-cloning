@@ -6,34 +6,9 @@ import datetime
 
 from torch.distributed.run import main as torchrun
 
-# I don't want this invoked from an import
-if __name__ != "__main__":
-    raise Exception("Do not invoke this from an import")
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--yaml', type=str, help='Path to training configuration file.', default='./training/voice/train.yml', nargs='+') # ugh
-parser.add_argument('--launcher', choices=['none', 'pytorch'], default='none', help='Job launcher')
-args = parser.parse_args()
-args.yaml = " ".join(args.yaml) # absolutely disgusting
-config_path = args.yaml
-
-with open(config_path, 'r') as file:
-    opt_config = yaml.safe_load(file)
-
 # it'd be downright sugoi if I was able to install DLAS as a pip package
 sys.path.insert(0, './modules/dlas/codes/')
 sys.path.insert(0, './modules/dlas/')
-
-# yucky override
-if "bitsandbytes" in opt_config and not opt_config["bitsandbytes"]:
-    os.environ['BITSANDBYTES_OVERRIDE_LINEAR'] = '0'
-    os.environ['BITSANDBYTES_OVERRIDE_EMBEDDING'] = '0'
-    os.environ['BITSANDBYTES_OVERRIDE_ADAM'] = '0'
-    os.environ['BITSANDBYTES_OVERRIDE_ADAMW'] = '0'
-
-import torch
-from codes import train as tr
-from utils import util, options as option
 
 # this is effectively just copy pasted and cleaned up from the __main__ section of training.py
 def train(config_path, launcher='none'):
@@ -59,13 +34,35 @@ def train(config_path, launcher='none'):
     trainer.init(config_path, opt, launcher, '')
     trainer.do_training()
 
-try:
-    import torch_intermediary
-    if torch_intermediary.OVERRIDE_ADAM:
-        print("Using BitsAndBytes optimizations")
-    else:
-        print("NOT using BitsAndBytes optimizations")
-except Exception as e:
-    pass
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--yaml', type=str, help='Path to training configuration file.', default='./training/voice/train.yml', nargs='+') # ugh
+    parser.add_argument('--launcher', choices=['none', 'pytorch'], default='none', help='Job launcher')
+    args = parser.parse_args()
+    args.yaml = " ".join(args.yaml) # absolutely disgusting
+    config_path = args.yaml
 
-train(config_path, args.launcher)
+    with open(config_path, 'r') as file:
+        opt_config = yaml.safe_load(file)
+
+    # yucky override
+    if "bitsandbytes" in opt_config and not opt_config["bitsandbytes"]:
+        os.environ['BITSANDBYTES_OVERRIDE_LINEAR'] = '0'
+        os.environ['BITSANDBYTES_OVERRIDE_EMBEDDING'] = '0'
+        os.environ['BITSANDBYTES_OVERRIDE_ADAM'] = '0'
+        os.environ['BITSANDBYTES_OVERRIDE_ADAMW'] = '0'
+
+    try:
+        import torch_intermediary
+        if torch_intermediary.OVERRIDE_ADAM:
+            print("Using BitsAndBytes optimizations")
+        else:
+            print("NOT using BitsAndBytes optimizations")
+    except Exception as e:
+        pass
+
+    import torch
+    from codes import train as tr
+    from utils import util, options as option
+
+    train(config_path, args.launcher)
