@@ -8,6 +8,9 @@ spkr_name_getter: "lambda p: p.parts[-3]"
 model: ${model_name}
 batch_size: ${batch_size}
 eval_batch_size: ${validation_batch_size}
+
+max_iter: ${iterations}
+save_ckpt_every: ${save_rate}
 eval_every: ${validation_rate}
 
 sampling_temperature: 1.0

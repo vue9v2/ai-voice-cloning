@@ -47,7 +47,7 @@ WHISPER_MODELS = ["tiny", "base", "small", "medium", "large"]
 WHISPER_SPECIALIZED_MODELS = ["tiny.en", "base.en", "small.en", "medium.en"]
 WHISPER_BACKENDS = ["openai/whisper", "lightmare/whispercpp"]
 VOCODERS = ['univnet', 'bigvgan_base_24khz_100band', 'bigvgan_24khz_100band']
-TTSES = ['tortoise'] # + ['vall-e']
+TTSES = ['tortoise']
 
 GENERATE_SETTINGS_ARGS = None
 
@@ -68,6 +68,9 @@ try:
 	VALLE_ENABLED = True
 except Exception as e:
 	pass
+
+if VALLE_ENABLED:
+	TTSES.append('vall-e')
 
 args = None
 tts = None
@@ -613,27 +616,40 @@ class TrainingState():
 		with open(config_path, 'r') as file:
 			self.config = yaml.safe_load(file)
 
-		gpus = self.config["gpus"]
 
 		self.killed = False
+		
+		self.it = 0
+		self.step = 0
+		self.epoch = 0
+		self.checkpoint = 0
 
-		self.dataset_dir = f"./training/{self.config['name']}/finetune/"
-		self.batch_size = self.config['datasets']['train']['batch_size']
-		self.dataset_path = self.config['datasets']['train']['path']
+		if args.tts_backend == "tortoise":
+			gpus = self.config["gpus"]
+
+			self.dataset_dir = f"./training/{self.config['name']}/finetune/"
+			self.batch_size = self.config['datasets']['train']['batch_size']
+			self.dataset_path = self.config['datasets']['train']['path']
+			
+			self.its = self.config['train']['niter']
+			self.steps = 1
+			self.epochs = 1 # int(self.its*self.batch_size/self.dataset_size)
+			self.checkpoints = int(self.its / self.config['logger']['save_checkpoint_freq'])
+		elif args.tts_backend == "vall-e":
+			self.batch_size = self.config['batch_size']
+			self.dataset_dir = f".{self.config['data_root']}/finetune/"
+			self.dataset_path = f"{self.config['data_root']}/train.txt"
+
+			self.its = 1
+			self.steps = 1
+			self.epochs = 1
+			self.checkpoints = 1
+
+			self.json_config = json.load(open(f"{self.config['data_root']}/train.json", 'r', encoding="utf-8"))
+			gpus = self.json_config['gpus']
+
 		with open(self.dataset_path, 'r', encoding="utf-8") as f:
 			self.dataset_size = len(f.readlines())
-
-		self.it = 0
-		self.its = self.config['train']['niter']
-		
-		self.step = 0
-		self.steps = 1
-
-		self.epoch = 0
-		self.epochs = int(self.its*self.batch_size/self.dataset_size)
-
-		self.checkpoint = 0
-		self.checkpoints = int(self.its / self.config['logger']['save_checkpoint_freq'])
 
 		self.buffer = []
 
@@ -672,7 +688,10 @@ class TrainingState():
 			self.spawn_process(config_path=config_path, gpus=gpus)
 
 	def spawn_process(self, config_path, gpus=1):
-		self.cmd = ['train.bat', config_path] if os.name == "nt" else ['./train.sh', config_path]
+		if args.tts_backend == "vall-e":
+			self.cmd = ['torchrun', '--nproc_per_node', f'{gpus}', '-m', 'vall_e.train', f'yaml="{config_path}"']
+		else:
+			self.cmd = ['train.bat', config_path] if os.name == "nt" else ['./train.sh', config_path]
 
 		print("Spawning process: ", " ".join(self.cmd))
 		self.process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
@@ -1221,6 +1240,8 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 	lines = {
 		'training': [],
 		'validation': [],
+		'recordings': [],
+		'supervisions': [],
 	}
 
 	normalizer = EnglishTextNormalizer() if normalize else None
@@ -1310,28 +1331,22 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 
 			lines['training' if not culled else 'validation'].append(line) 
 
-			if culled or not VALLE_ENABLED:
+			if culled or args.tts_backend != "vall-e":
 				continue
 			
-			# VALL-E dataset
 			os.makedirs(f'{indir}/valle/', exist_ok=True)
 
-			try:
-				from vall_e.emb.qnt import encode as quantize
-				from vall_e.emb.g2p import encode as phonemize
-				
-				if waveform.shape[0] == 2:
-					waveform = wav[:1]
+			from vall_e.emb.qnt import encode as quantize
+			from vall_e.emb.g2p import encode as phonemize
+			
+			if waveform.shape[0] == 2:
+				waveform = wav[:1]
 
-				quantized = quantize( waveform, sample_rate ).cpu()
-				torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
-				
-				phonemes = phonemize(normalized_text)
-				open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(" ".join(phonemes))
-
-			except Exception as e:
-				print(e)
-				pass
+			quantized = quantize( waveform, sample_rate ).cpu()
+			torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
+			
+			phonemes = phonemize(normalized_text)
+			open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(" ".join(phonemes))
 
 	training_joined = "\n".join(lines['training'])
 	validation_joined = "\n".join(lines['validation'])
@@ -1588,12 +1603,13 @@ def save_training_settings( **kwargs ):
 		with open(out, 'w', encoding="utf-8") as f:
 			f.write(yaml)
 	
-	use_template(f'./models/.template.dlas.yaml', f'./training/{settings["voice"]}/train.yaml')
-
-	settings['model_name'] = "ar"
-	use_template(f'./models/.template.valle.yaml', f'./training/{settings["voice"]}/ar.yaml')
-	settings['model_name'] = "nar"
-	use_template(f'./models/.template.valle.yaml', f'./training/{settings["voice"]}/nar.yaml')
+	if args.tts_backend == "tortoise":
+		use_template(f'./models/.template.dlas.yaml', f'./training/{settings["voice"]}/train.yaml')
+	elif args.tts_backend == "vall-e":
+		settings['model_name'] = "ar"
+		use_template(f'./models/.template.valle.yaml', f'./training/{settings["voice"]}/ar.yaml')
+		settings['model_name'] = "nar"
+		use_template(f'./models/.template.valle.yaml', f'./training/{settings["voice"]}/nar.yaml')
 
 	messages.append(f"Saved training output")
 	return settings, messages
@@ -1692,7 +1708,12 @@ def get_dataset_list(dir="./training/"):
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.txt" in os.listdir(os.path.join(dir, d)) ])
 
 def get_training_list(dir="./training/"):
-	return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
+	if args.tts_backend == "tortoise":
+		return sorted([f'./training/{d}/train.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.yaml" in os.listdir(os.path.join(dir, d)) ])
+	
+	ars = sorted([f'./training/{d}/ar.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "ar.yaml" in os.listdir(os.path.join(dir, d)) ])
+	nars = sorted([f'./training/{d}/nar.yaml' for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "nar.yaml" in os.listdir(os.path.join(dir, d)) ])
+	return ars + nars
 
 def pad(num, zeroes):
 	return str(num).zfill(zeroes+1)
