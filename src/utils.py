@@ -1994,6 +1994,15 @@ def save_args_settings():
 	with open(f'./config/exec.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(settings, indent='\t') )
 
+def tokenize_text( text ):
+	from tortoise.utils.tokenizer import VoiceBpeTokenizer
+
+	tokenizer = VoiceBpeTokenizer()
+	encoded = tokenizer.encode(text)
+	decoded = tokenizer.tokenizer.decode(encoded, skip_special_tokens=False)
+
+	return "\n".join([ str(encoded), decoded ])
+
 # super kludgy )`;
 def import_generate_settings(file = None):
 	if not file:

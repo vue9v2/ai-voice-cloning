@@ -409,17 +409,25 @@ def setup_gradio():
 					history_audio = gr.Audio()
 					history_copy_settings_button = gr.Button(value="Copy Settings")
 		with gr.Tab("Utilities"):
-			with gr.Row():
-				with gr.Column():
-					audio_in = gr.Files(type="file", label="Audio Input", file_types=["audio"])
-					import_voice_name = gr.Textbox(label="Voice Name")
-					import_voice_button = gr.Button(value="Import Voice")
-				with gr.Column(visible=False) as col:
-					utilities_metadata_column = col
+			with gr.Tab("Import / Analyze"):
+				with gr.Row():
+					with gr.Column():
+						audio_in = gr.Files(type="file", label="Audio Input", file_types=["audio"])
+						import_voice_name = gr.Textbox(label="Voice Name")
+						import_voice_button = gr.Button(value="Import Voice")
+					with gr.Column(visible=False) as col:
+						utilities_metadata_column = col
 
-					metadata_out = gr.JSON(label="Audio Metadata")
-					copy_button = gr.Button(value="Copy Settings")
-					latents_out = gr.File(type="binary", label="Voice Latents")
+						metadata_out = gr.JSON(label="Audio Metadata")
+						copy_button = gr.Button(value="Copy Settings")
+						latents_out = gr.File(type="binary", label="Voice Latents")
+			with gr.Tab("Tokenizer"):
+				with gr.Row():
+					text_tokenizier_input = gr.TextArea(label="Text", max_lines=4)
+					text_tokenizier_output = gr.TextArea(label="Tokenized Text", max_lines=4)
+
+				with gr.Row():
+					text_tokenizier_button = gr.Button(value="Tokenize Text")
 		with gr.Tab("Training"):
 			with gr.Tab("Prepare Dataset"):
 				with gr.Row():
@@ -710,6 +718,11 @@ def setup_gradio():
 				history_results_list,
 			],
 			outputs=generate_settings
+		)
+
+		text_tokenizier_button.click(tokenize_text,
+			inputs=text_tokenizier_input,
+			outputs=text_tokenizier_output
 		)
 
 		refresh_configs.click(

@@ -24,7 +24,7 @@ datasets:
     num_conditioning_candidates: 2
     conditioning_length: 44000
     use_bpe_tokenizer: True
-    tokenizer_vocab: ./models/tortoise/bpe_lowercase_asr_256.json
+    tokenizer_vocab: ./modules/tortoise-tts/tortoise/data/tokenizer.json # ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
   val:
     name: validation
@@ -41,7 +41,7 @@ datasets:
     num_conditioning_candidates: 2
     conditioning_length: 44000
     use_bpe_tokenizer: True
-    tokenizer_vocab: ./models/tortoise/bpe_lowercase_asr_256.json
+    tokenizer_vocab: ./modules/tortoise-tts/tortoise/data/tokenizer.json # ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
 
 steps:        
@@ -61,13 +61,13 @@ steps:
     injectors:
       paired_to_mel:
         type: torch_mel_spectrogram
-        mel_norm_file: ./models/tortoise/clips_mel_norms.pth
+        mel_norm_file: ./modules/tortoise-tts/tortoise/data/mel_norms.pth # ./models/tortoise/clips_mel_norms.pth
         in: wav
         out: paired_mel
       paired_cond_to_mel:
         type: for_each
         subtype: torch_mel_spectrogram
-        mel_norm_file: ./models/tortoise/clips_mel_norms.pth
+        mel_norm_file: ./modules/tortoise-tts/tortoise/data/mel_norms.pth # ./models/tortoise/clips_mel_norms.pth
         in: conditioning
         out: paired_conditioning_mel
       to_codes:
