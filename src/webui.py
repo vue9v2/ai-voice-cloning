@@ -256,8 +256,9 @@ def import_training_settings_proxy( voice ):
 	output = {}
 	for k in TRAINING_SETTINGS:
 		if k not in settings:
-			continue
-		output[k] = settings[k]
+			output[k] = gr.update()
+		else:
+			output[k] = gr.update(value=settings[k])
 
 	output = list(output.values())
 
