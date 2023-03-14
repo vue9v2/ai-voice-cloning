@@ -1,0 +1,9 @@
+data_dirs: [./training/${voice}/valle/]
+spkr_name_getter: "lambda p: p.parts[-3]"
+
+model: ${model_name}
+batch_size: ${batch_size}
+eval_batch_size: ${validation_batch_size}
+eval_every: ${validation_rate}
+
+sampling_temperature: 1.0

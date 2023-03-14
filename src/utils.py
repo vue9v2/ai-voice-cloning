@@ -20,6 +20,8 @@ import subprocess
 import psutil
 import yaml
 import hashlib
+import io
+import gzip
 
 import tqdm
 import torch
@@ -45,6 +47,7 @@ WHISPER_MODELS = ["tiny", "base", "small", "medium", "large"]
 WHISPER_SPECIALIZED_MODELS = ["tiny.en", "base.en", "small.en", "medium.en"]
 WHISPER_BACKENDS = ["openai/whisper", "lightmare/whispercpp"]
 VOCODERS = ['univnet', 'bigvgan_base_24khz_100band', 'bigvgan_24khz_100band']
+TTSES = ['tortoise'] # + ['vall-e']
 
 GENERATE_SETTINGS_ARGS = None
 
@@ -55,6 +58,16 @@ RESAMPLERS = {}
 
 MIN_TRAINING_DURATION = 0.6
 MAX_TRAINING_DURATION = 11.6097505669
+
+VALLE_ENABLED = False
+
+try:
+	from vall_e.emb.qnt import encode as quantize
+	from vall_e.emb.g2p import encode as phonemize
+
+	VALLE_ENABLED = True
+except Exception as e:
+	pass
 
 args = None
 tts = None
@@ -1195,7 +1208,7 @@ def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0, resul
 	messages.append(f"Sliced segments: {files} => {segments}.")
 	return "\n".join(messages)
 
-def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=False ):
+def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=True ):
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
 	messages = []
@@ -1273,6 +1286,8 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=F
 				continue
 
 			waveform, sample_rate = torchaudio.load(path)
+			num_channels, num_frames = waveform.shape
+			duration = num_frames / sample_rate
 
 			error = validate_waveform( waveform, sample_rate )
 			if error:
@@ -1281,20 +1296,42 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=F
 				messages.append(message)
 				errored += 1
 				continue
+			
 
 			culled = len(text) < text_length
 			if not culled and audio_length > 0:
-				num_channels, num_frames = waveform.shape
-				duration = num_frames / sample_rate
 				culled = duration < audio_length
 
 			# for when i add in a little treat ;), as it requires normalized text
-			if normalize and length(normalized_text) < 200:
+			if normalize and len(normalized_text) < 200:
 				line = f'audio/{file}|{text}|{normalized_text}'
 			else:
 				line = f'audio/{file}|{text}'
 
 			lines['training' if not culled else 'validation'].append(line) 
+
+			if culled or not VALLE_ENABLED:
+				continue
+			
+			# VALL-E dataset
+			os.makedirs(f'{indir}/valle/', exist_ok=True)
+
+			try:
+				from vall_e.emb.qnt import encode as quantize
+				from vall_e.emb.g2p import encode as phonemize
+				
+				if waveform.shape[0] == 2:
+					waveform = wav[:1]
+
+				quantized = quantize( waveform, sample_rate ).cpu()
+				torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
+				
+				phonemes = phonemize(normalized_text)
+				open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(" ".join(phonemes))
+
+			except Exception as e:
+				print(e)
+				pass
 
 	training_joined = "\n".join(lines['training'])
 	validation_joined = "\n".join(lines['validation'])
@@ -1538,21 +1575,27 @@ def save_training_settings( **kwargs ):
 		settings['source_model'] = f"pretrain_model_gpt: '{settings['source_model']}'"
 		settings['resume_state'] = f"# resume_state: '{settings['resume_state']}'"
 
-	with open(f'./models/.template.yaml', 'r', encoding="utf-8") as f:
-		yaml = f.read()
+	def use_template(template, out):
+		with open(template, 'r', encoding="utf-8") as f:
+			yaml = f.read()
 
-	# i could just load and edit the YAML directly, but this is easier, as I don't need to bother with path traversals
-	for k in settings:
-		if settings[k] is None:
-			continue
-		yaml = yaml.replace(f"${{{k}}}", str(settings[k]))
+		# i could just load and edit the YAML directly, but this is easier, as I don't need to bother with path traversals
+		for k in settings:
+			if settings[k] is None:
+				continue
+			yaml = yaml.replace(f"${{{k}}}", str(settings[k]))
 
-	outyaml = f'./training/{settings["voice"]}/train.yaml'
-	with open(outyaml, 'w', encoding="utf-8") as f:
-		f.write(yaml)
+		with open(out, 'w', encoding="utf-8") as f:
+			f.write(yaml)
 	
+	use_template(f'./models/.template.dlas.yaml', f'./training/{settings["voice"]}/train.yaml')
 
-	messages.append(f"Saved training output to: {outyaml}")
+	settings['model_name'] = "ar"
+	use_template(f'./models/.template.valle.yaml', f'./training/{settings["voice"]}/ar.yaml')
+	settings['model_name'] = "nar"
+	use_template(f'./models/.template.valle.yaml', f'./training/{settings["voice"]}/nar.yaml')
+
+	messages.append(f"Saved training output")
 	return settings, messages
 
 def import_voices(files, saveAs=None, progress=None):
@@ -1743,17 +1786,22 @@ def setup_args():
 		'latents-lean-and-mean': True,
 		'voice-fixer': False, # getting tired of long initialization times in a Colab for downloading a large dataset for it
 		'voice-fixer-use-cuda': True,
+		
 		'force-cpu-for-conditioning-latents': False,
 		'defer-tts-load': False,
 		'device-override': None,
 		'prune-nonfinal-outputs': True,
-		'vocoder-model': VOCODERS[-1],
 		'concurrency-count': 2,
-		'autocalculate-voice-chunk-duration-size': 0,
+		'autocalculate-voice-chunk-duration-size': 10,
+
 		'output-sample-rate': 44100,
 		'output-volume': 1,
 		
+		'tts-backend': TTSES[0],
+		
 		'autoregressive-model': None,
+		'vocoder-model': VOCODERS[-1],
+
 		'whisper-backend': 'openai/whisper',
 		'whisper-model': "base",
 
@@ -1792,6 +1840,7 @@ def setup_args():
 	parser.add_argument("--output-sample-rate", type=int, default=default_arguments['output-sample-rate'], help="Sample rate to resample the output to (from 24KHz)")
 	parser.add_argument("--output-volume", type=float, default=default_arguments['output-volume'], help="Adjusts volume of output")
 	
+	parser.add_argument("--tts-backend", default=default_arguments['tts-backend'], help="Specifies which TTS backend to use.")
 	parser.add_argument("--autoregressive-model", default=default_arguments['autoregressive-model'], help="Specifies which autoregressive model to use for sampling.")
 	parser.add_argument("--whisper-backend", default=default_arguments['whisper-backend'], action='store_true', help="Picks which whisper backend to use (openai/whisper, lightmare/whispercpp)")
 	parser.add_argument("--whisper-model", default=default_arguments['whisper-model'], help="Specifies which whisper model to use for transcription.")
@@ -1828,10 +1877,48 @@ def setup_args():
 	
 	return args
 
+def get_default_settings( hypenated=True ):
+	settings = {
+		'listen': None if not args.listen else args.listen,
+		'share': args.share,
+		'low-vram':args.low_vram,
+		'check-for-updates':args.check_for_updates,
+		'models-from-local-only':args.models_from_local_only,
+		'force-cpu-for-conditioning-latents': args.force_cpu_for_conditioning_latents,
+		'defer-tts-load': args.defer_tts_load,
+		'prune-nonfinal-outputs': args.prune_nonfinal_outputs,
+		'device-override': args.device_override,
+		'sample-batch-size': args.sample_batch_size,
+		'embed-output-metadata': args.embed_output_metadata,
+		'latents-lean-and-mean': args.latents_lean_and_mean,
+		'voice-fixer': args.voice_fixer,
+		'voice-fixer-use-cuda': args.voice_fixer_use_cuda,
+		'concurrency-count': args.concurrency_count,
+		'output-sample-rate': args.output_sample_rate,
+		'autocalculate-voice-chunk-duration-size': args.autocalculate_voice_chunk_duration_size,
+		'output-volume': args.output_volume,
+		
+		'tts-backend': args.tts_backend,
+
+		'autoregressive-model': args.autoregressive_model,
+		'vocoder-model': args.vocoder_model,
+
+		'whisper-backend': args.whisper_backend,
+		'whisper-model': args.whisper_model,
+
+		'training-default-halfp': args.training_default_halfp,
+		'training-default-bnb': args.training_default_bnb,
+	}
+
+	res = {}
+	for k in settings:
+		res[k.replace("-", "_") if not hypenated else k] = settings[k]
+	return res
+
 def update_args( **kwargs ):
 	global args
 
-	settings = {}
+	settings = get_default_settings(hypenated=False)
 	settings.update(kwargs)
 
 	args.listen = settings['listen']
@@ -1853,8 +1940,10 @@ def update_args( **kwargs ):
 	args.autocalculate_voice_chunk_duration_size = settings['autocalculate_voice_chunk_duration_size']
 	args.output_volume = settings['output_volume']
 	
+	args.tts_backend = settings['tts_backend']
 	args.autoregressive_model = settings['autoregressive_model']
 	args.vocoder_model = settings['vocoder_model']
+
 	args.whisper_backend = settings['whisper_backend']
 	args.whisper_model = settings['whisper_model']
 
@@ -1865,34 +1954,7 @@ def update_args( **kwargs ):
 
 def save_args_settings():
 	global args
-	settings = {
-		'listen': None if not args.listen else args.listen,
-		'share': args.share,
-		'low-vram':args.low_vram,
-		'check-for-updates':args.check_for_updates,
-		'models-from-local-only':args.models_from_local_only,
-		'force-cpu-for-conditioning-latents': args.force_cpu_for_conditioning_latents,
-		'defer-tts-load': args.defer_tts_load,
-		'prune-nonfinal-outputs': args.prune_nonfinal_outputs,
-		'device-override': args.device_override,
-		'sample-batch-size': args.sample_batch_size,
-		'embed-output-metadata': args.embed_output_metadata,
-		'latents-lean-and-mean': args.latents_lean_and_mean,
-		'voice-fixer': args.voice_fixer,
-		'voice-fixer-use-cuda': args.voice_fixer_use_cuda,
-		'concurrency-count': args.concurrency_count,
-		'output-sample-rate': args.output_sample_rate,
-		'autocalculate-voice-chunk-duration-size': args.autocalculate_voice_chunk_duration_size,
-		'output-volume': args.output_volume,
-		
-		'autoregressive-model': args.autoregressive_model,
-		'vocoder-model': args.vocoder_model,
-		'whisper-backend': args.whisper_backend,
-		'whisper-model': args.whisper_model,
-
-		'training-default-halfp': args.training_default_halfp,
-		'training-default-bnb': args.training_default_bnb,
-	}
+	settings = get_default_settings()
 
 	os.makedirs('./config/', exist_ok=True)
 	with open(f'./config/exec.json', 'w', encoding="utf-8") as f:
@@ -2009,18 +2071,13 @@ def load_tts( restart=False, autoregressive_model=None ):
 	if autoregressive_model == "auto":
 		autoregressive_model = deduce_autoregressive_model()
 
-	print(f"Loading TorToiSe... (AR: {autoregressive_model}, vocoder: {args.vocoder_model})")
 
 	if get_device_name() == "cpu":
 		print("!!!! WARNING !!!! No GPU available in PyTorch. You may need to reinstall PyTorch.")
 
 	tts_loading = True
-	try:
-		tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=autoregressive_model, vocoder_model=args.vocoder_model)
-	except Exception as e:
-		tts = TextToSpeech(minor_optimizations=not args.low_vram)
-		load_autoregressive_model(autoregressive_model)
-
+	print(f"Loading TorToiSe... (AR: {autoregressive_model}, vocoder: {args.vocoder_model})")
+	tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=autoregressive_model, vocoder_model=args.vocoder_model)		
 	tts_loading = False
 
 	get_model_path('dvae.pth')
