@@ -155,9 +155,9 @@ def import_generate_settings_proxy( file=None ):
 
 	return tuple(res)
 
-def reset_generate_settings_proxy( file=None ):
+def reset_generate_settings_proxy():
 	global GENERATE_SETTINGS_ARGS
-	settings = reset_generate_settings( file )
+	settings = reset_generate_settings()
 
 	res = []
 	for k in GENERATE_SETTINGS_ARGS:
@@ -359,7 +359,7 @@ def setup_gradio():
 					GENERATE_SETTINGS["temperature"] = gr.Slider(value=0.2, minimum=0, maximum=1, step=0.1, label="Temperature")
 					
 					show_experimental_settings = gr.Checkbox(label="Show Experimental Settings")
-					reset_generation_settings_button = gr.Button(value="Reset to Default")
+					reset_generate_settings_button = gr.Button(value="Reset to Default")
 				with gr.Column(visible=False) as col:
 					experimental_column = col
 
@@ -697,8 +697,8 @@ def setup_gradio():
 			outputs=generate_settings
 		)
 
-		reset_generation_settings_button.click(
-			fn=reset_generation_settings_proxy,
+		reset_generate_settings_button.click(
+			fn=reset_generate_settings_proxy,
 			inputs=None,
 			outputs=generate_settings
 		)

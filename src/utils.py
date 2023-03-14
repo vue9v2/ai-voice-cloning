@@ -2004,7 +2004,7 @@ def import_generate_settings(file = None):
 		'delimiter': None,
 		'emotion': None,
 		'prompt': None,
-		'voice': None,
+		'voice': "random",
 		'mic_audio': None,
 		'voice_latents_chunks': None,
 		'candidates': None,
@@ -2030,7 +2030,7 @@ def import_generate_settings(file = None):
 	
 	return res
 
-def reset_generation_settings():
+def reset_generate_settings():
 	with open(f'./config/generate.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps({}, indent='\t') )
 	return import_generate_settings()
