@@ -49,6 +49,7 @@ WHISPER_BACKENDS = ["openai/whisper", "lightmare/whispercpp"]
 VOCODERS = ['univnet', 'bigvgan_base_24khz_100band', 'bigvgan_24khz_100band']
 TTSES = ['tortoise']
 
+INFERENCING = False
 GENERATE_SETTINGS_ARGS = None
 
 LEARNING_RATE_SCHEMES = {"Multistep": "MultiStepLR", "Cos. Annealing": "CosineAnnealingLR_Restart"}
@@ -320,6 +321,7 @@ def generate(**kwargs):
 
 		return info
 
+	INFERENCING = True
 	for line, cut_text in enumerate(texts):
 		if parameters['emotion'] == "Custom":
 			if parameters['prompt'] and parameters['prompt'].strip() != "":
@@ -371,6 +373,7 @@ def generate(**kwargs):
 
 	del gen
 	do_gc()
+	INFERENCING = False
 
 	for k in audio_cache:
 		audio = audio_cache[k]['audio']
@@ -486,7 +489,11 @@ def generate(**kwargs):
 	)
 
 def cancel_generate():
+	if not INFERENCING:
+		return
+		
 	import tortoise.api
+
 	tortoise.api.STOP_SIGNAL = True
 
 def hash_file(path, algo="md5", buffer_size=0):
