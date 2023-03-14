@@ -49,7 +49,7 @@ VOCODERS = ['univnet', 'bigvgan_base_24khz_100band', 'bigvgan_24khz_100band']
 GENERATE_SETTINGS_ARGS = None
 
 LEARNING_RATE_SCHEMES = {"Multistep": "MultiStepLR", "Cos. Annealing": "CosineAnnealingLR_Restart"}
-LEARNING_RATE_SCHEDULE = [ 9, 18, 25, 33 ]
+LEARNING_RATE_SCHEDULE = [ 2, 4, 9, 18, 25, 33, 50 ]
 
 RESAMPLERS = {}
 
