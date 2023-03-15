@@ -1364,7 +1364,7 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 			from vall_e.emb.g2p import encode as phonemize
 			
 			if waveform.shape[0] == 2:
-				waveform = wav[:1]
+				waveform = waveform[:1]
 
 			quantized = quantize( waveform, sample_rate ).cpu()
 			torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
