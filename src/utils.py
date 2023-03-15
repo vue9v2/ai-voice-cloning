@@ -1734,7 +1734,7 @@ def get_diffusion_models(dir="./models/finetunes/", prefixed=False):
 	return relative_paths([ get_model_path('diffusion_decoder.pth') ])
 
 def get_tokenizer_jsons( dir="./models/tokenizers/" ):
-	additionals = sorted([ f'{additional_path}/{d}' for d in os.listdir(dir) if d[-5:] == ".json" ]) if os.path.isdir(dir) else []
+	additionals = sorted([ f'{dir}/{d}' for d in os.listdir(dir) if d[-5:] == ".json" ]) if os.path.isdir(dir) else []
 	return relative_paths([ "./modules/tortoise-tts/tortoise/data/tokenizer.json" ] + additionals)
 
 def tokenize_text( text ):
