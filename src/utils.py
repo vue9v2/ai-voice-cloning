@@ -37,7 +37,7 @@ from datetime import timedelta
 from tortoise.api import TextToSpeech, MODELS, get_model_path, pad_or_truncate
 from tortoise.utils.audio import load_audio, load_voice, load_voices, get_voice_dir, get_voices
 from tortoise.utils.text import split_and_recombine_text
-from tortoise.utils.device import get_device_name, set_device_name, get_device_count, get_device_vram, do_gc
+from tortoise.utils.device import get_device_name, set_device_name, get_device_count, get_device_vram, get_device_batch_size, do_gc
 
 from whisper.normalizers.english import EnglishTextNormalizer
 
@@ -1929,6 +1929,8 @@ def setup_args():
 	if not args.device_override:
 		set_device_name(args.device_override)
 
+	if args.sample_batch_size == 0 and get_device_batch_size() == 1:
+		print("!WARNING! Automatically deduced sample batch size returned 1.")
 
 	args.listen_host = None
 	args.listen_port = None
