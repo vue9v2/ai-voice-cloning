@@ -310,7 +310,11 @@ def setup_gradio():
 	voice_list_with_defaults = get_voice_list(append_defaults=True)
 	voice_list = get_voice_list()
 	result_voices = get_voice_list("./results/")
+	
 	autoregressive_models = get_autoregressive_models()
+	diffusion_models = get_diffusion_models()
+	tokenizer_jsons = get_tokenizer_jsons()
+
 	dataset_list = get_dataset_list()
 	training_list = get_training_list()
 
@@ -560,17 +564,20 @@ def setup_gradio():
 					EXEC_SETTINGS['force_cpu_for_conditioning_latents'] = gr.Checkbox(label="Force CPU for Conditioning Latents", value=args.force_cpu_for_conditioning_latents)
 					EXEC_SETTINGS['defer_tts_load'] = gr.Checkbox(label="Do Not Load TTS On Startup", value=args.defer_tts_load)
 					EXEC_SETTINGS['prune_nonfinal_outputs'] = gr.Checkbox(label="Delete Non-Final Output", value=args.prune_nonfinal_outputs)
-					EXEC_SETTINGS['device_override'] = gr.Textbox(label="Device Override", value=args.device_override)
 				with gr.Column():
 					EXEC_SETTINGS['sample_batch_size'] = gr.Number(label="Sample Batch Size", precision=0, value=args.sample_batch_size)
 					EXEC_SETTINGS['concurrency_count'] = gr.Number(label="Gradio Concurrency Count", precision=0, value=args.concurrency_count)
 					EXEC_SETTINGS['autocalculate_voice_chunk_duration_size'] = gr.Number(label="Auto-Calculate Voice Chunk Duration (in seconds)", precision=0, value=args.autocalculate_voice_chunk_duration_size)
 					EXEC_SETTINGS['output_volume'] = gr.Slider(label="Output Volume", minimum=0, maximum=2, value=args.output_volume)
+					EXEC_SETTINGS['device_override'] = gr.Textbox(label="Device Override", value=args.device_override)
 					
+				with gr.Column():
 					# EXEC_SETTINGS['tts_backend'] = gr.Dropdown(TTSES, label="TTS Backend", value=args.tts_backend if args.tts_backend else TTSES[0])
 
 					EXEC_SETTINGS['autoregressive_model'] = gr.Dropdown(choices=autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else autoregressive_models[0])
+					EXEC_SETTINGS['diffusion_model'] = gr.Dropdown(choices=diffusion_models, label="Diffusion Model", value=args.diffusion_model if args.diffusion_model else diffusion_models[0])
 					EXEC_SETTINGS['vocoder_model'] = gr.Dropdown(VOCODERS, label="Vocoder", value=args.vocoder_model if args.vocoder_model else VOCODERS[-1])
+					EXEC_SETTINGS['tokenizer_json'] = gr.Dropdown(tokenizer_jsons, label="Tokenizer JSON Path", value=args.tokenizer_json if args.tokenizer_json else tokenizer_jsons[0])
 					
 					EXEC_SETTINGS['training_default_halfp'] = TRAINING_SETTINGS['half_p']
 					EXEC_SETTINGS['training_default_bnb'] = TRAINING_SETTINGS['bitsandbytes']
@@ -585,16 +592,37 @@ def setup_gradio():
 						)
 						# kill_button = gr.Button(value="Close UI")
 
-					def update_model_list_proxy( val ):
+					def update_model_list_proxy( autoregressive, diffusion, tokenizer ):
 						autoregressive_models = get_autoregressive_models()
-						if val not in autoregressive_models:
-							val = autoregressive_models[0]
-						return gr.update( choices=autoregressive_models, value=val )
+						if autoregressive not in autoregressive_models:
+							autoregressive = autoregressive_models[0]
+
+						diffusion_models = get_diffusion_models()
+						if diffusion not in diffusion_models:
+							diffusion = diffusion_models[0]
+
+						tokenizer_jsons = get_tokenizer_jsons()
+						if tokenizer not in tokenizer_jsons:
+							tokenizer = tokenizer_jsons[0]
+
+						return (
+							gr.update( choices=autoregressive_models, value=autoregressive ),
+							gr.update( choices=diffusion_models, value=diffusion ),
+							gr.update( choices=tokenizer_jsons, value=tokenizer ),
+						)
 
 					autoregressive_models_update_button.click(
 						update_model_list_proxy,
-						inputs=EXEC_SETTINGS['autoregressive_model'],
-						outputs=EXEC_SETTINGS['autoregressive_model'],
+						inputs=[
+							EXEC_SETTINGS['autoregressive_model'],
+							EXEC_SETTINGS['diffusion_model'],
+							EXEC_SETTINGS['tokenizer_json'],
+						],
+						outputs=[
+							EXEC_SETTINGS['autoregressive_model'],
+							EXEC_SETTINGS['diffusion_model'],
+							EXEC_SETTINGS['tokenizer_json'],
+						],
 					)
 
 				exec_inputs = list(EXEC_SETTINGS.values())

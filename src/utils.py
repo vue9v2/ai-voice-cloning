@@ -192,7 +192,10 @@ def generate(**kwargs):
 			'half_p': "Half Precision" in parameters['experimentals'],
 			'cond_free': "Conditioning-Free" in parameters['experimentals'],
 			'cvvp_amount': parameters['cvvp_weight'],
+			
 			'autoregressive_model': args.autoregressive_model,
+			'diffusion_model': args.diffusion_model,
+			'tokenizer_json': args.tokenizer_json,
 		}
 
 		# could be better to just do a ternary on everything above, but i am not a professional
@@ -210,6 +213,14 @@ def generate(**kwargs):
 			if settings['autoregressive_model'] == "auto":
 				settings['autoregressive_model'] = deduce_autoregressive_model(selected_voice)
 			tts.load_autoregressive_model(settings['autoregressive_model'])
+
+		if settings['diffusion_model'] is not None:
+			if settings['diffusion_model'] == "auto":
+				settings['diffusion_model'] = deduce_diffusion_model(selected_voice)
+			tts.load_diffusion_model(settings['diffusion_model'])
+		
+		if settings['tokenizer_json'] is not None:
+			tts.load_tokenizer_json(settings['tokenizer_json'])
 
 		settings['voice_samples'], settings['conditioning_latents'], _ = fetch_voice(voice=selected_voice)
 
@@ -1547,6 +1558,7 @@ def save_training_settings( **kwargs ):
 			settings['validation_batch_size'] = validation_lines
 			messages.append(f"Batch size exceeds validation dataset size, clamping validation batch size to {validation_lines}")
 
+	settings['tokenizer_json'] = args.tokenizer_json
 
 	if settings['gpus'] > get_device_count():
 		settings['gpus'] = get_device_count()
@@ -1679,6 +1691,9 @@ def import_voices(files, saveAs=None, progress=None):
 
 			print(f"Imported voice to {path}")
 
+def relative_paths( dirs ):
+	return [ './' + os.path.relpath( d ).replace("\\", "/") for d in dirs ]
+
 def get_voice_list(dir=get_voice_dir(), append_defaults=False):
 	defaults = [ "random", "microphone" ]
 	os.makedirs(dir, exist_ok=True)
@@ -1686,6 +1701,7 @@ def get_voice_list(dir=get_voice_dir(), append_defaults=False):
 	if append_defaults:
 		res = res + defaults
 	return res
+
 
 def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
 	os.makedirs(dir, exist_ok=True)
@@ -1702,9 +1718,6 @@ def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
 		models = sorted([ int(d[:-8]) for d in os.listdir(f'./training/{training}/finetune/models/') if d[-8:] == "_gpt.pth" ])
 		found = found + [ f'./training/{training}/finetune/models/{d}_gpt.pth' for d in models ]
 
-	if len(found) > 0 or len(additionals) > 0:
-		base = ["auto"] + base
-
 	res = base + additionals + found
 	
 	if prefixed:
@@ -1715,7 +1728,27 @@ def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
 
 			res[i] = f'[{shorthash}] {path}'
 
-	return res
+	return ["auto"] + relative_paths(res)
+
+def get_diffusion_models(dir="./models/finetunes/", prefixed=False):
+	return relative_paths([ get_model_path('diffusion_decoder.pth') ])
+
+def get_tokenizer_jsons( dir="./models/tokenizers/" ):
+	additionals = sorted([ f'{additional_path}/{d}' for d in os.listdir(dir) if d[-5:] == ".json" ]) if os.path.isdir(dir) else []
+	return relative_paths([ "./modules/tortoise-tts/tortoise/data/tokenizer.json" ] + additionals)
+
+def tokenize_text( text ):
+	from tortoise.utils.tokenizer import VoiceBpeTokenizer
+
+	if not tts:
+		if tts_loading:
+			raise Exception("TTS is still initializing...")
+		load_tts()
+
+	encoded = tts.tokenizer.encode(text)
+	decoded = tts.tokenizer.tokenizer.decode(encoded, skip_special_tokens=False)
+
+	return "\n".join([ str(encoded), decoded ])
 
 def get_dataset_list(dir="./training/"):
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.txt" in os.listdir(os.path.join(dir, d)) ])
@@ -1834,7 +1867,9 @@ def setup_args():
 		'tts-backend': TTSES[0],
 		
 		'autoregressive-model': None,
+		'diffusion-model': None,
 		'vocoder-model': VOCODERS[-1],
+		'tokenizer-json': None,
 
 		'whisper-backend': 'openai/whisper',
 		'whisper-model': "base",
@@ -1866,7 +1901,6 @@ def setup_args():
 	parser.add_argument("--force-cpu-for-conditioning-latents", default=default_arguments['force-cpu-for-conditioning-latents'], action='store_true', help="Forces computing conditional latents to be done on the CPU (if you constantyl OOM on low chunk counts)")
 	parser.add_argument("--defer-tts-load", default=default_arguments['defer-tts-load'], action='store_true', help="Defers loading TTS model")
 	parser.add_argument("--prune-nonfinal-outputs", default=default_arguments['prune-nonfinal-outputs'], action='store_true', help="Deletes non-final output files on completing a generation")
-	parser.add_argument("--vocoder-model", default=default_arguments['vocoder-model'], action='store_true', help="Specifies with vocoder to use")
 	parser.add_argument("--device-override", default=default_arguments['device-override'], help="A device string to override pass through Torch")
 	parser.add_argument("--sample-batch-size", default=default_arguments['sample-batch-size'], type=int, help="Sets how many batches to use during the autoregressive samples pass")
 	parser.add_argument("--concurrency-count", type=int, default=default_arguments['concurrency-count'], help="How many Gradio events to process at once")
@@ -1875,7 +1909,12 @@ def setup_args():
 	parser.add_argument("--output-volume", type=float, default=default_arguments['output-volume'], help="Adjusts volume of output")
 	
 	parser.add_argument("--tts-backend", default=default_arguments['tts-backend'], help="Specifies which TTS backend to use.")
+
 	parser.add_argument("--autoregressive-model", default=default_arguments['autoregressive-model'], help="Specifies which autoregressive model to use for sampling.")
+	parser.add_argument("--diffusion-model", default=default_arguments['diffusion-model'], help="Specifies which diffusion model to use for sampling.")
+	parser.add_argument("--vocoder-model", default=default_arguments['vocoder-model'], action='store_true', help="Specifies with vocoder to use")
+	parser.add_argument("--tokenizer-json", default=default_arguments['tokenizer-json'], help="Specifies which tokenizer json to use for tokenizing.")
+
 	parser.add_argument("--whisper-backend", default=default_arguments['whisper-backend'], action='store_true', help="Picks which whisper backend to use (openai/whisper, lightmare/whispercpp)")
 	parser.add_argument("--whisper-model", default=default_arguments['whisper-model'], help="Specifies which whisper model to use for transcription.")
 	
@@ -1935,7 +1974,9 @@ def get_default_settings( hypenated=True ):
 		'tts-backend': args.tts_backend,
 
 		'autoregressive-model': args.autoregressive_model,
+		'diffusion-model': args.diffusion_model,
 		'vocoder-model': args.vocoder_model,
+		'tokenizer-json': args.tokenizer_json,
 
 		'whisper-backend': args.whisper_backend,
 		'whisper-model': args.whisper_model,
@@ -1975,8 +2016,11 @@ def update_args( **kwargs ):
 	args.output_volume = settings['output_volume']
 	
 	args.tts_backend = settings['tts_backend']
+	
 	args.autoregressive_model = settings['autoregressive_model']
+	args.diffusion_model = settings['diffusion_model']
 	args.vocoder_model = settings['vocoder_model']
+	args.tokenizer_json = settings['tokenizer_json']
 
 	args.whisper_backend = settings['whisper_backend']
 	args.whisper_model = settings['whisper_model']
@@ -1993,15 +2037,6 @@ def save_args_settings():
 	os.makedirs('./config/', exist_ok=True)
 	with open(f'./config/exec.json', 'w', encoding="utf-8") as f:
 		f.write(json.dumps(settings, indent='\t') )
-
-def tokenize_text( text ):
-	from tortoise.utils.tokenizer import VoiceBpeTokenizer
-
-	tokenizer = VoiceBpeTokenizer()
-	encoded = tokenizer.encode(text)
-	decoded = tokenizer.tokenizer.decode(encoded, skip_special_tokens=False)
-
-	return "\n".join([ str(encoded), decoded ])
 
 # super kludgy )`;
 def import_generate_settings(file = None):
@@ -2099,7 +2134,7 @@ def version_check_tts( min_version ):
 		return True
 	return False
 
-def load_tts( restart=False, autoregressive_model=None ):
+def load_tts( restart=False, autoregressive_model=None, diffusion_model=None, vocoder_model=None, tokenizer_json=None ):
 	global args
 	global tts
 
@@ -2114,13 +2149,27 @@ def load_tts( restart=False, autoregressive_model=None ):
 	if autoregressive_model == "auto":
 		autoregressive_model = deduce_autoregressive_model()
 
+	if diffusion_model:
+		args.diffusion_model = diffusion_model
+	else:
+		diffusion_model = args.diffusion_model
+
+	if vocoder_model:
+		args.vocoder_model = vocoder_model
+	else:
+		vocoder_model = args.vocoder_model
+
+	if tokenizer_json:
+		args.tokenizer_json = tokenizer_json
+	else:
+		tokenizer_json = args.tokenizer_json
 
 	if get_device_name() == "cpu":
 		print("!!!! WARNING !!!! No GPU available in PyTorch. You may need to reinstall PyTorch.")
 
 	tts_loading = True
-	print(f"Loading TorToiSe... (AR: {autoregressive_model}, vocoder: {args.vocoder_model})")
-	tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=autoregressive_model, vocoder_model=args.vocoder_model)		
+	print(f"Loading TorToiSe... (AR: {autoregressive_model}, vocoder: {vocoder_model})")
+	tts = TextToSpeech(minor_optimizations=not args.low_vram, autoregressive_model_path=autoregressive_model, diffusion_model_path=diffusion_model, vocoder_model=vocoder_model, tokenizer_json=tokenizer_json)
 	tts_loading = False
 
 	get_model_path('dvae.pth')
@@ -2207,6 +2256,40 @@ def update_autoregressive_model(autoregressive_model_path):
 	
 	return autoregressive_model_path
 
+def update_diffusion_model(diffusion_model_path):
+	match = re.findall(r'^\[[a-fA-F0-9]{8}\] (.+?)$', diffusion_model_path)
+	if match:
+		diffusion_model_path = match[0]
+
+	if not diffusion_model_path or not os.path.exists(diffusion_model_path):
+		print(f"Invalid model: {diffusion_model_path}")
+		return
+
+	args.diffusion_model = diffusion_model_path
+	save_args_settings()
+	print(f'Stored diffusion model to settings: {diffusion_model_path}')
+
+	global tts
+	if not tts:
+		if tts_loading:
+			raise Exception("TTS is still initializing...")
+		return
+	
+	if hasattr(tts, "loading") and tts.loading:
+		raise Exception("TTS is still initializing...")
+
+	if diffusion_model_path == "auto":
+		diffusion_model_path = deduce_diffusion_model()
+
+	if diffusion_model_path == tts.diffusion_model_path:
+		return
+
+	tts.load_diffusion_model(diffusion_model_path)
+
+	do_gc()
+	
+	return diffusion_model_path
+
 def update_vocoder_model(vocoder_model):
 	args.vocoder_model = vocoder_model
 	save_args_settings()
@@ -2224,6 +2307,28 @@ def update_vocoder_model(vocoder_model):
 	print(f"Loading model: {vocoder_model}")
 	tts.load_vocoder_model(vocoder_model)
 	print(f"Loaded model: {tts.vocoder_model}")
+
+	do_gc()
+	
+	return vocoder_model
+
+def update_tokenizer(tokenizer_json):
+	args.tokenizer_json = tokenizer_json
+	save_args_settings()
+	print(f'Stored tokenizer to settings: {tokenizer_json}')
+
+	global tts
+	if not tts:
+		if tts_loading:
+			raise Exception("TTS is still initializing...")
+		return
+
+	if hasattr(tts, "loading") and tts.loading:
+		raise Exception("TTS is still initializing...")
+
+	print(f"Loading model: {tokenizer_json}")
+	tts.load_tokenizer_json(tokenizer_json)
+	print(f"Loaded model: {tts.tokenizer_json}")
 
 	do_gc()
 	

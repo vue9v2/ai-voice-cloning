@@ -24,7 +24,7 @@ datasets:
     num_conditioning_candidates: 2
     conditioning_length: 44000
     use_bpe_tokenizer: True
-    tokenizer_vocab: ./modules/tortoise-tts/tortoise/data/tokenizer.json # ./models/tortoise/bpe_lowercase_asr_256.json
+    tokenizer_vocab: ${tokenizer_json} # ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
   val:
     name: validation
@@ -41,7 +41,7 @@ datasets:
     num_conditioning_candidates: 2
     conditioning_length: 44000
     use_bpe_tokenizer: True
-    tokenizer_vocab: ./modules/tortoise-tts/tortoise/data/tokenizer.json # ./models/tortoise/bpe_lowercase_asr_256.json
+    tokenizer_vocab: ${tokenizer_json} # ./models/tortoise/bpe_lowercase_asr_256.json
     load_aligned_codes: False
 
 steps:        
