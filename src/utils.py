@@ -1558,7 +1558,7 @@ def save_training_settings( **kwargs ):
 			settings['validation_batch_size'] = validation_lines
 			messages.append(f"Batch size exceeds validation dataset size, clamping validation batch size to {validation_lines}")
 
-	settings['tokenizer_json'] = args.tokenizer_json
+	settings['tokenizer_json'] = args.tokenizer_json if args.tokenizer_json else get_tokenizer_jsons()[0]
 
 	if settings['gpus'] > get_device_count():
 		settings['gpus'] = get_device_count()
