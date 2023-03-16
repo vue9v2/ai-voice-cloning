@@ -22,7 +22,7 @@ import yaml
 import hashlib
 import string
 
-import tqdm
+from tqdm import tqdm
 import torch
 import torchaudio
 import music_tag
@@ -1269,6 +1269,28 @@ def phonemizer( text, language="eng" ):
 	return ["_" if p in ignored else p for p in phones]
 """
 
+def phonemize_txt( path ):
+	with open(path, 'r', encoding='utf-8') as f:
+		lines = f.readlines()
+
+	reparsed = []
+	with open(path.replace(".txt", ".phn.txt"), 'a', encoding='utf-8') as f:
+		for line in enumerate_progress(lines, desc='Phonemizing...'):
+			split = line.split("|")
+			audio = split[0]
+			text = split[2]
+
+			phonemes = phonemizer( text, preserve_punctuation=True, strip=True )
+			reparsed.append(f'{audio}|{phonemes}')
+			f.write(f'\n{audio}|{phonemes}')
+	
+
+	joined = "\n".join(reparsed)
+	with open(path.replace(".txt", ".phn.txt"), 'w', encoding='utf-8') as f:
+		f.write(joined)
+
+	return joined
+
 def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, progress=gr.Progress() ):
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
@@ -1858,7 +1880,7 @@ def enumerate_progress(iterable, desc=None, progress=None, verbose=None):
 		print(desc)
 
 	if progress is None:
-		return tqdm(iterable, disable=not verbose)
+		return tqdm(iterable, disable=False) #not verbose)
 	return progress.tqdm(iterable, desc=f'{progress.msg_prefix} {desc}' if hasattr(progress, 'msg_prefix') else desc, track_tqdm=True)
 
 def notify_progress(message, progress=None, verbose=True):

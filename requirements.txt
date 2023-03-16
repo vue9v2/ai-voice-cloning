@@ -6,3 +6,4 @@ gradio
 music-tag
 voicefixer
 psutil
+phonemizer
