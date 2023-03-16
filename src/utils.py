@@ -1351,11 +1351,12 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, n
 			normalized_text = normalizer(text) if normalize else None
 			try:
 				phonemes = phonemizer( text, language=language, preserve_punctuation=True, strip=True ) if phonemize else None
+				if phonemize:
+					text = phonemes
 			except Exception as e:
+				print(e)
 				pass
 
-			if phonemize and phonemes:
-				text = phonemes
 
 			if len(text) > 200:
 				message = f"Text length too long (200 < {len(text)}), skipping... {file}"
