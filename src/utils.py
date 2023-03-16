@@ -2224,8 +2224,8 @@ def unload_tts():
 		print("Unloaded TTS")
 	do_gc()
 
-def reload_tts( model=None ):
-	load_tts( restart=True, model=model )
+def reload_tts():
+	load_tts( restart=True )
 
 def get_current_voice():
 	global current_voice

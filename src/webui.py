@@ -588,7 +588,7 @@ def setup_gradio():
 						gr.Button(value="Check for Updates").click(check_for_updates)
 						gr.Button(value="(Re)Load TTS").click(
 							reload_tts,
-							inputs=EXEC_SETTINGS['autoregressive_model'],
+							inputs=None,
 							outputs=None
 						)
 						# kill_button = gr.Button(value="Close UI")
