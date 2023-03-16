@@ -1781,7 +1781,7 @@ def tokenize_text( text ):
 		load_tts()
 
 	encoded = tts.tokenizer.encode(text)
-	decoded = tts.tokenizer.tokenizer.decode(encoded, skip_special_tokens=False).replace(" ", "")
+	decoded = tts.tokenizer.tokenizer.decode(encoded, skip_special_tokens=False).replace(" ", "").replace("[SPACE]", " ")
 
 	return "\n".join([ str(encoded), decoded ])
 
