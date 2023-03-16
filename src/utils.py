@@ -1274,7 +1274,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, n
 	infile = f'{indir}/whisper.json'
 	messages = []
 
-	phonemize = args.tokenizer_json is not None and phonemize=args.tokenizer_json[-8:] == "ipa.json"
+	phonemize = args.tokenizer_json is not None and args.tokenizer_json[-8:] == "ipa.json"
 	if args.tts_backend == "vall-e":
 		phonemize = True
 
