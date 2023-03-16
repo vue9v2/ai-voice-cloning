@@ -744,7 +744,7 @@ class TrainingState():
 			self.steps = int(self.info['steps'])
 
 		if 'iteration_rate' in self.info:
-			it_rate = self.info['iteration_rate'] * self.batch_size # why
+			it_rate = self.info['iteration_rate']
 			self.it_rate = f'{"{:.3f}".format(1/it_rate)}it/s' if 0 < it_rate and it_rate < 1 else f'{"{:.3f}".format(it_rate)}s/it'
 			self.it_rates += it_rate
 
