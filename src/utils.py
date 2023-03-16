@@ -20,8 +20,7 @@ import subprocess
 import psutil
 import yaml
 import hashlib
-import io
-import gzip
+import string
 
 import tqdm
 import torch
@@ -40,6 +39,13 @@ from tortoise.utils.text import split_and_recombine_text
 from tortoise.utils.device import get_device_name, set_device_name, get_device_count, get_device_vram, get_device_batch_size, do_gc
 
 from whisper.normalizers.english import EnglishTextNormalizer
+from whisper.normalizers.basic import BasicTextNormalizer
+from whisper.tokenizer import LANGUAGES 
+
+try:
+	from phonemizer import phonemize as phonemizer
+except Exception as e:
+	pass
 
 MODELS['dvae.pth'] = "https://huggingface.co/jbetker/tortoise-tts-v2/resolve/3704aea61678e7e468a06d8eea121dba368a798e/.models/dvae.pth"
 
@@ -64,7 +70,7 @@ VALLE_ENABLED = False
 
 try:
 	from vall_e.emb.qnt import encode as quantize
-	from vall_e.emb.g2p import encode as phonemize
+	# from vall_e.emb.g2p import encode as phonemize
 
 	VALLE_ENABLED = True
 except Exception as e:
@@ -1157,7 +1163,6 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 	if whisper_model is None:
 		load_whisper_model(language=language)
 
-
 	results = {}
 
 	files = sorted( get_voices(load_latents=False)[voice] )
@@ -1175,14 +1180,15 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 		if basename in results and skip_existings:
 			print(f"Skipping already parsed file: {basename}")
 		else:
-			results[basename] = whisper_transcribe(file, language=language)
+			result = whisper_transcribe(file, language=language)
+			results[basename] = result
 
 		waveform, sample_rate = torchaudio.load(file)
 		# resample to the input rate, since it'll get resampled for training anyways
 		# this should also "help" increase throughput a bit when filling the dataloaders
 		waveform, sample_rate = resample(waveform, sample_rate, tts.input_sample_rate if tts is not None else 22050)
 
-		torchaudio.save(f"{indir}/audio/{basename}", waveform, sample_rate)
+		torchaudio.save(f"{indir}/audio/{basename}", waveform, sample_rate, encoding="PCM_S", bits_per_sample=16)
 
 		with open(infile, 'w', encoding="utf-8") as f:
 			f.write(json.dumps(results, indent='\t'))
@@ -1248,17 +1254,27 @@ def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0, resul
 				messages.append(message)
 				continue
 			sliced, _ = resample( sliced, sample_rate, 22050 )
-			torchaudio.save(f"{indir}/audio/{file}", sliced, 22050)
+			torchaudio.save(f"{indir}/audio/{file}", sliced, 22050, encoding="PCM_S", bits_per_sample=16)
 			
 			segments +=1
 
 	messages.append(f"Sliced segments: {files} => {segments}.")
 	return "\n".join(messages)
 
-def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=True ):
+"""
+def phonemizer( text, language="eng" ):
+	transducer = make_g2p(language, f'{language}-ipa')
+	phones = transducer(text).output_string
+	ignored = [" "] + [ p for p in string.punctuation ]
+	return ["_" if p in ignored else p for p in phones]
+"""
+
+def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, normalize=True ):
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
 	messages = []
+
+	phonemize = phonemize=args.tokenizer_json[-8:] == "ipa.json"
 
 	if not os.path.exists(infile):
 		raise Exception(f"Missing dataset: {infile}")
@@ -1272,12 +1288,19 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 		'supervisions': [],
 	}
 
-	normalizer = EnglishTextNormalizer() if normalize else None
 
 	errored = 0
 	for filename in results:
-		result = results[filename]
 		use_segment = use_segments
+		
+		result = results[filename]
+		language = LANGUAGES[result['language']] if result['language'] in LANGUAGES else None
+		if language == "english":
+			language = "en-us"
+	
+		normalizer = None
+		if normalize:
+			normalizer = EnglishTextNormalizer() if language.lower()[:2] == "en" else BasicTextNormalizer()
 
 		# check if unsegmented text exceeds 200 characters
 		if not use_segment:
@@ -1325,7 +1348,14 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 				continue
 			
 			text = segment['text'].strip()
-			normalized_text = normalizer(text) if normalize and result['language'] == "en" else text
+			normalized_text = normalizer(text) if normalize else None
+			try:
+				phonemes = phonemizer( text, language=language, preserve_punctuation=True, strip=True ) if phonemize else None
+			except Exception as e:
+				pass
+
+			if phonemize and phonemes:
+				text = phonemes
 
 			if len(text) > 200:
 				message = f"Text length too long (200 < {len(text)}), skipping... {file}"
@@ -1351,11 +1381,7 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 			if not culled and audio_length > 0:
 				culled = duration < audio_length
 
-			# for when i add in a little treat ;), as it requires normalized text
-			if normalize and len(normalized_text) < 200:
-				line = f'audio/{file}|{text}|{normalized_text}'
-			else:
-				line = f'audio/{file}|{text}'
+			line = f'audio/{file}|{text}'
 
 			lines['training' if not culled else 'validation'].append(line) 
 
@@ -1365,7 +1391,7 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 			os.makedirs(f'{indir}/valle/', exist_ok=True)
 
 			from vall_e.emb.qnt import encode as quantize
-			from vall_e.emb.g2p import encode as phonemize
+			# from vall_e.emb.g2p import encode as phonemize
 			
 			if waveform.shape[0] == 2:
 				waveform = waveform[:1]
@@ -1373,8 +1399,8 @@ def prepare_dataset( voice, use_segments, text_length, audio_length, normalize=T
 			quantized = quantize( waveform, sample_rate ).cpu()
 			torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
 			
-			phonemes = phonemize(normalized_text)
-			open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(" ".join(phonemes))
+			# phonemes = phonemizer(normalized_text)
+			open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(" ".join(text))
 
 	training_joined = "\n".join(lines['training'])
 	validation_joined = "\n".join(lines['validation'])
@@ -1536,8 +1562,10 @@ def save_training_settings( **kwargs ):
 	
 	if settings['save_rate'] < 1:
 		settings['save_rate'] = 1
+	"""
 	if settings['validation_rate'] < 1:
 		settings['validation_rate'] = 1
+	"""
 
 	settings['validation_batch_size'] = int(settings['batch_size'] / settings['gradient_accumulation_size'])
 
@@ -1554,7 +1582,6 @@ def save_training_settings( **kwargs ):
 		settings['validation_enabled'] = False
 		messages.append("Validation batch size == 0, disabling validation...")
 	else:
-		settings['validation_enabled'] = True
 		with open(settings['validation_path'], 'r', encoding="utf-8") as f:
 			validation_lines = len(f.readlines())
 

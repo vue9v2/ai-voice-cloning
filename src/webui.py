@@ -443,7 +443,7 @@ def setup_gradio():
 							DATASET_SETTINGS['validation_text_length'] = gr.Number(label="Validation Text Length Threshold", value=12, precision=0)
 							DATASET_SETTINGS['validation_audio_length'] = gr.Number(label="Validation Audio Length Threshold", value=1 )
 						with gr.Row():
-							DATASET_SETTINGS['skip'] = gr.Checkbox(label="Skip Already Transcribed", value=False)
+							DATASET_SETTINGS['skip'] = gr.Checkbox(label="Skip Existing", value=False)
 							DATASET_SETTINGS['slice'] = gr.Checkbox(label="Slice Segments", value=False)
 							DATASET_SETTINGS['trim_silence'] = gr.Checkbox(label="Trim Silence", value=False)
 						with gr.Row():
@@ -496,6 +496,7 @@ def setup_gradio():
 						with gr.Row():
 							TRAINING_SETTINGS["half_p"] = gr.Checkbox(label="Half Precision", value=args.training_default_halfp)
 							TRAINING_SETTINGS["bitsandbytes"] = gr.Checkbox(label="BitsAndBytes", value=args.training_default_bnb)
+							TRAINING_SETTINGS["validation_enabled"] = gr.Checkbox(label="Validation Enabled", value=False)
 
 						with gr.Row():
 							TRAINING_SETTINGS["workers"] = gr.Number(label="Worker Processes", value=2, precision=0)
