@@ -7,7 +7,7 @@ python3 -m venv venv
 source ./venv/bin/activate
 python3 -m pip install --upgrade pip # just to be safe
 # ROCM
-pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
+pip3 install torch==1.13.1 torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/rocm5.2 # 5.4.2 doesn't work for me desu
 # install requirements
 python3 -m pip install -r ./modules/tortoise-tts/requirements.txt # install TorToiSe requirements
 python3 -m pip install -e ./modules/tortoise-tts/ # install TorToiSe
