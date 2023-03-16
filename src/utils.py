@@ -1269,11 +1269,11 @@ def phonemizer( text, language="eng" ):
 	return ["_" if p in ignored else p for p in phones]
 """
 
-def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, normalize=True, progress=gr.Progress() ):
+def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, progress=gr.Progress() ):
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
 	messages = []
-
+	normalize = True
 	phonemize = args.tokenizer_json is not None and args.tokenizer_json[-8:] == "ipa.json"
 	if args.tts_backend == "vall-e":
 		phonemize = True
@@ -1301,7 +1301,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, n
 	
 		normalizer = None
 		if normalize:
-			normalizer = EnglishTextNormalizer() if language.lower()[:2] == "en" else BasicTextNormalizer()
+			normalizer = EnglishTextNormalizer() if language and language == "english" else BasicTextNormalizer()
 
 		# check if unsegmented text exceeds 200 characters
 		if not use_segment:
@@ -2225,7 +2225,8 @@ def unload_tts():
 	do_gc()
 
 def reload_tts():
-	load_tts( restart=True )
+	unload_tts()
+	load_tts()
 
 def get_current_voice():
 	global current_voice
