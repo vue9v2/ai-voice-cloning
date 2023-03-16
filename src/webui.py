@@ -199,10 +199,10 @@ def prepare_dataset_proxy( voice, language, validation_text_length, validation_a
 	messages.append(message)
 
 	if slice_audio:
-		message = slice_dataset( voice, trim_silence=trim_silence, start_offset=slice_start_offset, end_offset=slice_end_offset )
+		message = slice_dataset( voice, trim_silence=trim_silence, start_offset=slice_start_offset, end_offset=slice_end_offset, progress=progress )
 		messages.append(message)
 
-	message = prepare_dataset( voice, use_segments=slice_audio, text_length=validation_text_length, audio_length=validation_audio_length )
+	message = prepare_dataset( voice, use_segments=slice_audio, text_length=validation_text_length, audio_length=validation_audio_length, progress=progress )
 	messages.append(message)
 
 	return "\n".join(messages)

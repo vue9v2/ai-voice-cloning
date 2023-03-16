@@ -1214,7 +1214,7 @@ def slice_waveform( waveform, sample_rate, start, end, trim ):
 
 	return sliced, error
 
-def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0, results=None ):
+def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0, results=None, progress=gr.Progress() ):
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
 	messages = []
@@ -1269,12 +1269,14 @@ def phonemizer( text, language="eng" ):
 	return ["_" if p in ignored else p for p in phones]
 """
 
-def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, normalize=True ):
+def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, normalize=True, progress=gr.Progress() ):
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
 	messages = []
 
-	phonemize = phonemize=args.tokenizer_json[-8:] == "ipa.json"
+	phonemize = args.tokenizer_json is not None and phonemize=args.tokenizer_json[-8:] == "ipa.json"
+	if args.tts_backend == "vall-e":
+		phonemize = True
 
 	if not os.path.exists(infile):
 		raise Exception(f"Missing dataset: {infile}")
@@ -1283,11 +1285,10 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, n
 
 	lines = {
 		'training': [],
-		'validation': [],
-		'recordings': [],
-		'supervisions': [],
+		'validation': []
 	}
 
+	already_segmented = []
 
 	errored = 0
 	for filename in results:
@@ -1328,11 +1329,13 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, n
 
 		segments = result['segments'] if use_segment else [{'text': result['text']}]
 
-		for segment in segments:
+		for segment in enumerate_progress(segments, desc="Parsing segments", progress=progress):
 			file = filename.replace(".wav", f"_{pad(segment['id'], 4)}.wav") if use_segment else filename
 			path = f'{indir}/audio/{file}'
 			# segment when needed
-			if not os.path.exists(path):
+			if not os.path.exists(path) and filename not in already_segmented:
+				already_segmented.append(filename)
+
 				tmp_results = {}
 				tmp_results[filename] = result
 				print(f"Audio not segmented, segmenting: {filename}")
@@ -2360,9 +2363,9 @@ def update_tokenizer(tokenizer_json):
 	if hasattr(tts, "loading") and tts.loading:
 		raise Exception("TTS is still initializing...")
 
-	print(f"Loading model: {tokenizer_json}")
+	print(f"Loading tokenizer vocab: {tokenizer_json}")
 	tts.load_tokenizer_json(tokenizer_json)
-	print(f"Loaded model: {tts.tokenizer_json}")
+	print(f"Loaded tokenizer vocab: {tts.tokenizer_json}")
 
 	do_gc()
 	
