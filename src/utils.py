@@ -1401,7 +1401,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, n
 			torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
 			
 			# phonemes = phonemizer(normalized_text)
-			open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(" ".join(text))
+			open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(text)
 
 	training_joined = "\n".join(lines['training'])
 	validation_joined = "\n".join(lines['validation'])
