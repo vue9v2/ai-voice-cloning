@@ -1894,7 +1894,7 @@ def tokenize_text( text, stringed=True, skip_specials=False ):
 	if not tts:
 		tokenizer = VoiceBpeTokenizer(args.tokenizer_json if args.tokenizer_json else get_tokenizer_jsons()[0])
 	else:
-		tts.tokenizer
+		tokenizer = tts.tokenizer
 
 	encoded = tokenizer.encode(text)
 	decoded = tokenizer.tokenizer.decode(encoded, skip_special_tokens=skip_specials).split(" ")
