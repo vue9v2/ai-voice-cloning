@@ -1641,9 +1641,9 @@ def optimize_training_settings( **kwargs ):
 			if not os.path.exists(get_halfp_model_path()):
 				convert_to_halfp()	
 
-	settings['steps'] = int(iterations / settings['epochs'])
+	steps = int(iterations / settings['epochs'])
 
-	messages.append(f"For {settings['epochs']} epochs with {lines} lines in batches of {settings['batch_size']}, iterating for {iterations} steps ({settings['steps']}) steps per epoch)")
+	messages.append(f"For {settings['epochs']} epochs with {lines} lines in batches of {settings['batch_size']}, iterating for {iterations} steps ({steps}) steps per epoch)")
 
 	return settings, messages
 
