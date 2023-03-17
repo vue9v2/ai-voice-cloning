@@ -1372,12 +1372,20 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 
 		# implicitly segment
 		if use_segment and not use_segments:
-			tmp = {}
-			tmp[filename] = result
-			print(f"Audio not segmented, segmenting: {filename}")
-			message = slice_dataset( voice, results=tmp )
-			print(message)
-			messages = messages + message.split("\n")
+			exists = True
+			for segment in result['segments']:
+				if os.path.exists(filename.replace(".wav", f"_{pad(segment['id'], 4)}.wav")):
+					continue
+				exists = False
+				break
+
+			if not exists:
+				tmp = {}
+				tmp[filename] = result
+				print(f"Audio not segmented, segmenting: {filename}")
+				message = slice_dataset( voice, results=tmp )
+				print(message)
+				messages = messages + message.split("\n")
 
 		if not use_segment:
 			segments[filename] = {
@@ -1444,10 +1452,11 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 		# from vall_e.emb.g2p import encode as phonemize
 
 		quantized = quantize( waveform, sample_rate ).cpu()
-		print("Quantized:", file)
-		
 		torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
-		open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(text)
+		print("Quantized:", file)
+
+		tokens = tokenize_text(text, stringed=False, skip_specials=True)
+		open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(" ".join( tokens ).replace(" \u02C8", "\u02C8"))
 
 	training_joined = "\n".join(lines['training'])
 	validation_joined = "\n".join(lines['validation'])
@@ -1815,18 +1824,21 @@ def get_tokenizer_jsons( dir="./models/tokenizers/" ):
 	additionals = sorted([ f'{dir}/{d}' for d in os.listdir(dir) if d[-5:] == ".json" ]) if os.path.isdir(dir) else []
 	return relative_paths([ "./modules/tortoise-tts/tortoise/data/tokenizer.json" ] + additionals)
 
-def tokenize_text( text ):
+def tokenize_text( text, stringed=True, skip_specials=False ):
 	from tortoise.utils.tokenizer import VoiceBpeTokenizer
 
 	if not tts:
-		if tts_loading:
-			raise Exception("TTS is still initializing...")
-		load_tts()
+		tokenizer = VoiceBpeTokenizer(args.tokenizer_json if args.tokenizer_json else get_tokenizer_jsons()[0])
+	else:
+		tts.tokenizer
 
-	encoded = tts.tokenizer.encode(text)
-	decoded = tts.tokenizer.tokenizer.decode(encoded, skip_special_tokens=False).split(" ")
+	encoded = tokenizer.encode(text)
+	decoded = tokenizer.tokenizer.decode(encoded, skip_special_tokens=specials).split(" ")
 
-	return "\n".join([ str(encoded), str(decoded) ])
+	if stringed:
+		return "\n".join([ str(encoded), str(decoded) ])
+
+	return decoded
 
 def get_dataset_list(dir="./training/"):
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.txt" in os.listdir(os.path.join(dir, d)) ])
