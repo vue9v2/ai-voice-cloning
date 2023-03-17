@@ -467,12 +467,12 @@ def setup_gradio():
 				with gr.Row():
 					with gr.Column():
 						TRAINING_SETTINGS["epochs"] = gr.Number(label="Epochs", value=500, precision=0)
-						with gr.Row():
+						with gr.Row(visible=args.tts_backend=="tortoise"):
 							TRAINING_SETTINGS["learning_rate"] = gr.Slider(label="Learning Rate", value=1e-5, minimum=0, maximum=1e-4, step=1e-6)
 							TRAINING_SETTINGS["mel_lr_weight"] = gr.Slider(label="Mel LR Ratio", value=1.00, minimum=0, maximum=1)
 							TRAINING_SETTINGS["text_lr_weight"] = gr.Slider(label="Text LR Ratio", value=0.01, minimum=0, maximum=1)
 							
-						with gr.Row():
+						with gr.Row(visible=args.tts_backend=="tortoise"):
 							lr_schemes = list(LEARNING_RATE_SCHEMES.keys())
 							TRAINING_SETTINGS["learning_rate_scheme"] = gr.Radio(lr_schemes, label="Learning Rate Scheme", value=lr_schemes[0], type="value")
 							TRAINING_SETTINGS["learning_rate_schedule"] = gr.Textbox(label="Learning Rate Schedule", placeholder=str(LEARNING_RATE_SCHEDULE), visible=True)
@@ -488,22 +488,22 @@ def setup_gradio():
 							)
 						with gr.Row():
 							TRAINING_SETTINGS["batch_size"] = gr.Number(label="Batch Size", value=128, precision=0)
-							TRAINING_SETTINGS["gradient_accumulation_size"] = gr.Number(label="Gradient Accumulation Size", value=4, precision=0)
+							TRAINING_SETTINGS["gradient_accumulation_size"] = gr.Number(label="Gradient Accumulation Size", value=4, precision=0, visible=args.tts_backend=="tortoise")
 						with gr.Row():
 							TRAINING_SETTINGS["save_rate"] = gr.Number(label="Save Frequency (in epochs)", value=5, precision=0)
 							TRAINING_SETTINGS["validation_rate"] = gr.Number(label="Validation Frequency (in epochs)", value=5, precision=0)
 
 						with gr.Row():
-							TRAINING_SETTINGS["half_p"] = gr.Checkbox(label="Half Precision", value=args.training_default_halfp)
-							TRAINING_SETTINGS["bitsandbytes"] = gr.Checkbox(label="BitsAndBytes", value=args.training_default_bnb)
+							TRAINING_SETTINGS["half_p"] = gr.Checkbox(label="Half Precision", value=args.training_default_halfp, visible=args.tts_backend=="tortoise")
+							TRAINING_SETTINGS["bitsandbytes"] = gr.Checkbox(label="BitsAndBytes", value=args.training_default_bnb, visible=args.tts_backend=="tortoise")
 							TRAINING_SETTINGS["validation_enabled"] = gr.Checkbox(label="Validation Enabled", value=False)
 
 						with gr.Row():
-							TRAINING_SETTINGS["workers"] = gr.Number(label="Worker Processes", value=2, precision=0)
+							TRAINING_SETTINGS["workers"] = gr.Number(label="Worker Processes", value=2, precision=0, visible=args.tts_backend=="tortoise")
 							TRAINING_SETTINGS["gpus"] = gr.Number(label="GPUs", value=get_device_count(), precision=0)
 
-						TRAINING_SETTINGS["source_model"] = gr.Dropdown( choices=autoregressive_models, label="Source Model", type="value", value=autoregressive_models[0] )
-						TRAINING_SETTINGS["resume_state"] = gr.Textbox(label="Resume State Path", placeholder="./training/${voice}/finetune/training_state/${last_state}.state")
+						TRAINING_SETTINGS["source_model"] = gr.Dropdown( choices=autoregressive_models, label="Source Model", type="value", value=autoregressive_models[0], visible=args.tts_backend=="tortoise" )
+						TRAINING_SETTINGS["resume_state"] = gr.Textbox(label="Resume State Path", placeholder="./training/${voice}/finetune/training_state/${last_state}.state", visible=args.tts_backend=="tortoise")
 						
 						TRAINING_SETTINGS["voice"] = gr.Dropdown( choices=dataset_list, label="Dataset", type="value", value=dataset_list[0] if len(dataset_list) else ""  )
 
