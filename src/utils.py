@@ -1187,7 +1187,8 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 		# resample to the input rate, since it'll get resampled for training anyways
 		# this should also "help" increase throughput a bit when filling the dataloaders
 		waveform, sample_rate = resample(waveform, sample_rate, tts.input_sample_rate if tts is not None else 22050)
-
+		if waveform.shape[0] == 2:
+			waveform = waveform[:1]
 		torchaudio.save(f"{indir}/audio/{basename}", waveform, sample_rate, encoding="PCM_S", bits_per_sample=16)
 
 		with open(infile, 'w', encoding="utf-8") as f:
@@ -1254,6 +1255,10 @@ def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0, resul
 				messages.append(message)
 				continue
 			sliced, _ = resample( sliced, sample_rate, 22050 )
+
+			if waveform.shape[0] == 2:
+				waveform = waveform[:1]
+				
 			torchaudio.save(f"{indir}/audio/{file}", sliced, 22050, encoding="PCM_S", bits_per_sample=16)
 			
 			segments +=1
@@ -1261,15 +1266,8 @@ def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0, resul
 	messages.append(f"Sliced segments: {files} => {segments}.")
 	return "\n".join(messages)
 
-"""
-def phonemizer( text, language="eng" ):
-	transducer = make_g2p(language, f'{language}-ipa')
-	phones = transducer(text).output_string
-	ignored = [" "] + [ p for p in string.punctuation ]
-	return ["_" if p in ignored else p for p in phones]
-"""
-
-def phonemize_txt( path ):
+# takes an LJSpeech-dataset-formatted .txt file and phonemize it
+def phonemize_txt_file( path ):
 	with open(path, 'r', encoding='utf-8') as f:
 		lines = f.readlines()
 
@@ -1291,39 +1289,62 @@ def phonemize_txt( path ):
 
 	return joined
 
+# takes an LJSpeech-dataset-formatted .txt (and phonemized .phn.txt from the above) and creates a JSON that should slot in as whisper.json
+def create_dataset_json( path ):
+	with open(path, 'r', encoding='utf-8') as f:
+		lines = f.readlines()
+
+	phonemes = None
+	phn_path = path.replace(".txt", ".phn.txt")
+	if os.path.exists(phn_path):
+		with open(phn_path, 'r', encoding='utf-8') as f:
+			phonemes = f.readlines()
+
+	data = {}
+
+	for line in lines:
+		split = line.split("|")
+		audio = split[0]
+		text = split[1]
+
+		data[audio] = {
+			'text': text.strip()
+		}
+
+	for line in phonemes:
+		split = line.split("|")
+		audio = split[0]
+		text = split[1]
+
+		data[audio]['phonemes'] = text.strip()
+
+	with open(path.replace(".txt", ".json"), 'w', encoding='utf-8') as f:
+		f.write(json.dumps(data, indent="\t"))
+
 def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, progress=gr.Progress() ):
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
-	messages = []
-	normalize = True
-	phonemize = args.tokenizer_json is not None and args.tokenizer_json[-8:] == "ipa.json"
-	if args.tts_backend == "vall-e":
-		phonemize = True
-
 	if not os.path.exists(infile):
 		raise Exception(f"Missing dataset: {infile}")
 
 	results = json.load(open(infile, 'r', encoding="utf-8"))
 
-	lines = {
-		'training': [],
-		'validation': []
-	}
-
-	already_segmented = []
-
 	errored = 0
+	messages = []
+	normalize = True
+	phonemize = args.tokenizer_json is not None and args.tokenizer_json[-8:] == "ipa.json"
+	lines = { 'training': [], 'validation': [] }
+	segments = {}
+
+	if args.tts_backend == "vall-e":
+		phonemize = True
+
 	for filename in results:
 		use_segment = use_segments
-		
+
 		result = results[filename]
 		language = LANGUAGES[result['language']] if result['language'] in LANGUAGES else None
-		if language == "english":
-			language = "en-us"
-	
-		normalizer = None
-		if normalize:
-			normalizer = EnglishTextNormalizer() if language and language == "english" else BasicTextNormalizer()
+		normalizer = EnglishTextNormalizer() if language and language == "english" else BasicTextNormalizer()
 
 		# check if unsegmented text exceeds 200 characters
 		if not use_segment:
@@ -1349,84 +1370,84 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 				messages.append(message)
 				use_segment = True
 
-		segments = result['segments'] if use_segment else [{'text': result['text']}]
+		# implicitly segment
+		if use_segment and not use_segments:
+			tmp = {}
+			tmp[filename] = result
+			print(f"Audio not segmented, segmenting: {filename}")
+			message = slice_dataset( voice, results=tmp )
+			print(message)
+			messages = messages + message.split("\n")
 
-		for segment in enumerate_progress(segments, desc="Parsing segments", progress=progress):
-			file = filename.replace(".wav", f"_{pad(segment['id'], 4)}.wav") if use_segment else filename
-			path = f'{indir}/audio/{file}'
-			# segment when needed
-			if not os.path.exists(path) and filename not in already_segmented:
-				already_segmented.append(filename)
+		if not use_segment:
+			segments[filename] = {
+				'text': result['text'],
+				'language': language,
+				'normalizer': normalizer,
+				'phonemes': result['phonemes'] if 'phonemes' in result else None
+			}
+		else:
+			for segment in result['segments']:
+				segments[filename.replace(".wav", f"_{pad(segment['id'], 4)}.wav")] = {
+					'text': segment['text'],
+					'language': language,
+					'normalizer': normalizer,
+					'phonemes': segment['phonemes'] if 'phonemes' in segment else None
+				}
 
-				tmp_results = {}
-				tmp_results[filename] = result
-				print(f"Audio not segmented, segmenting: {filename}")
-				message = slice_dataset( voice, results=tmp_results )
-				print(message)
-				messages = messages + message.split("\n")
+	for file in enumerate_progress(segments, desc="Parsing segments", progress=progress):
+		result = segments[file]
+		path = f'{indir}/audio/{file}'
 
-			if not os.path.exists(path):
-				message = f"Missing source audio: {file}"
-				print(message)
-				messages.append(message)
-				errored += 1
-				continue
-			
-			text = segment['text'].strip()
-			normalized_text = normalizer(text) if normalize else None
-			try:
-				phonemes = phonemizer( text, language=language, preserve_punctuation=True, strip=True ) if phonemize else None
-				if phonemize:
-					text = phonemes
-			except Exception as e:
-				print(e)
-				pass
+		text = result['text']
+		language = result['language']
+		normalizer = result['normalizer']
+		phonemes = result['phonemes']
+		if phonemize and phonemes is None:
+			phonemes = phonemizer( text, language=language if language != "english" else "en-us", strip=True, preserve_punctuation=True, with_stress=True, backend=args.phonemizer_backend )
+		if phonemize:
+			text = phonemes
 
+		if len(text) > 200:
+			message = f"Text length too long (200 < {len(text)}), skipping... {file}"
+			print(message)
+			messages.append(message)
+			errored += 1
+			continue
 
-			if len(text) > 200:
-				message = f"Text length too long (200 < {len(text)}), skipping... {file}"
-				print(message)
-				messages.append(message)
-				errored += 1
-				continue
+		waveform, sample_rate = torchaudio.load(path)
+		num_channels, num_frames = waveform.shape
+		duration = num_frames / sample_rate
 
-			waveform, sample_rate = torchaudio.load(path)
-			num_channels, num_frames = waveform.shape
-			duration = num_frames / sample_rate
+		error = validate_waveform( waveform, sample_rate )
+		if error:
+			message = f"{error}, skipping... {file}"
+			print(message)
+			messages.append(message)
+			errored += 1
+			continue
 
-			error = validate_waveform( waveform, sample_rate )
-			if error:
-				message = f"{error}, skipping... {file}"
-				print(message)
-				messages.append(message)
-				errored += 1
-				continue
-			
+		culled = len(text) < text_length
+		if not culled and audio_length > 0:
+			culled = duration < audio_length
 
-			culled = len(text) < text_length
-			if not culled and audio_length > 0:
-				culled = duration < audio_length
+		line = f'audio/{file}|{text}'
 
-			line = f'audio/{file}|{text}'
+		lines['training' if not culled else 'validation'].append(line) 
 
-			lines['training' if not culled else 'validation'].append(line) 
+		if culled or args.tts_backend != "vall-e":
+			continue
+		
+		os.makedirs(f'{indir}/valle/', exist_ok=True)
 
-			if culled or args.tts_backend != "vall-e":
-				continue
-			
-			os.makedirs(f'{indir}/valle/', exist_ok=True)
+		from vall_e.emb.qnt import encode as quantize
+		# from vall_e.emb.g2p import encode as phonemize
 
-			from vall_e.emb.qnt import encode as quantize
-			# from vall_e.emb.g2p import encode as phonemize
-			
-			if waveform.shape[0] == 2:
-				waveform = waveform[:1]
-
-			quantized = quantize( waveform, sample_rate ).cpu()
-			torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
-			
-			# phonemes = phonemizer(normalized_text)
-			open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(text)
+		quantized = quantize( waveform, sample_rate ).cpu()
+		print("Quantized:", file)
+		
+		torch.save(quantized, f'{indir}/valle/{file.replace(".wav",".qnt.pt")}')
+		open(f'{indir}/valle/{file.replace(".wav",".phn.txt")}', 'w', encoding='utf-8').write(text)
 
 	training_joined = "\n".join(lines['training'])
 	validation_joined = "\n".join(lines['validation'])
@@ -1803,9 +1824,9 @@ def tokenize_text( text ):
 		load_tts()
 
 	encoded = tts.tokenizer.encode(text)
-	decoded = tts.tokenizer.tokenizer.decode(encoded, skip_special_tokens=False).replace(" ", "").replace("[SPACE]", " ")
+	decoded = tts.tokenizer.tokenizer.decode(encoded, skip_special_tokens=False).split(" ")
 
-	return "\n".join([ str(encoded), decoded ])
+	return "\n".join([ str(encoded), str(decoded) ])
 
 def get_dataset_list(dir="./training/"):
 	return sorted([d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d)) and "train.txt" in os.listdir(os.path.join(dir, d)) ])
@@ -1928,6 +1949,8 @@ def setup_args():
 		'vocoder-model': VOCODERS[-1],
 		'tokenizer-json': None,
 
+		'phonemizer-backend': 'espeak',
+
 		'whisper-backend': 'openai/whisper',
 		'whisper-model': "base",
 
@@ -1972,6 +1995,8 @@ def setup_args():
 	parser.add_argument("--vocoder-model", default=default_arguments['vocoder-model'], action='store_true', help="Specifies with vocoder to use")
 	parser.add_argument("--tokenizer-json", default=default_arguments['tokenizer-json'], help="Specifies which tokenizer json to use for tokenizing.")
 
+	parser.add_argument("--phonemizer-backend", default=default_arguments['phonemizer-backend'], help="Specifies which phonemizer backend to use.")
+	
 	parser.add_argument("--whisper-backend", default=default_arguments['whisper-backend'], action='store_true', help="Picks which whisper backend to use (openai/whisper, lightmare/whispercpp)")
 	parser.add_argument("--whisper-model", default=default_arguments['whisper-model'], help="Specifies which whisper model to use for transcription.")
 	
@@ -2037,6 +2062,8 @@ def get_default_settings( hypenated=True ):
 		'vocoder-model': args.vocoder_model,
 		'tokenizer-json': args.tokenizer_json,
 
+		'phonemizer-backend': args.phonemizer_backend,
+
 		'whisper-backend': args.whisper_backend,
 		'whisper-model': args.whisper_model,
 
@@ -2080,6 +2107,8 @@ def update_args( **kwargs ):
 	args.diffusion_model = settings['diffusion_model']
 	args.vocoder_model = settings['vocoder_model']
 	args.tokenizer_json = settings['tokenizer_json']
+
+	args.phonemizer_backend = settings['phonemizer_backend']
 
 	args.whisper_backend = settings['whisper_backend']
 	args.whisper_model = settings['whisper_model']
