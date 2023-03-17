@@ -1363,13 +1363,13 @@ def phonemizer( text, language="en-us" ):
 	return phonemize( text, language=language, strip=True, preserve_punctuation=True, with_stress=True, backend=args.phonemizer_backend )
 
 def should_phonemize():
-	try:
-		from phonemizer import phonemize
-	except Exception as e:
-		print(str(e))
-		return False
-
-	return args.tokenizer_json is not None and args.tokenizer_json[-8:] == "ipa.json"
+	should = args.tokenizer_json is not None and args.tokenizer_json[-8:] == "ipa.json"
+	if should:
+		try:
+			from phonemizer import phonemize
+		except Exception as e:
+			return False
+	return should
 
 def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, progress=gr.Progress() ):
 	indir = f'./training/{voice}/'
