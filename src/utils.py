@@ -252,7 +252,7 @@ def generate(**kwargs):
  
 	full_start_time = time.time()
  
-	outdir = f"./results/{voice}/"
+	outdir = f"./{args.results_folder}/{voice}/"
 	os.makedirs(outdir, exist_ok=True)
 
 	audio_cache = {}
@@ -2024,6 +2024,7 @@ def setup_args():
 
 		'output-sample-rate': 44100,
 		'output-volume': 1,
+		'results-folder': "./results/",
 		
 		'tts-backend': TTSES[0],
 		
@@ -2070,6 +2071,7 @@ def setup_args():
 	parser.add_argument("--autocalculate-voice-chunk-duration-size", type=float, default=default_arguments['autocalculate-voice-chunk-duration-size'], help="Number of seconds to suggest voice chunk size for (for example, 100 seconds of audio at 10 seconds per chunk will suggest 10 chunks)")
 	parser.add_argument("--output-sample-rate", type=int, default=default_arguments['output-sample-rate'], help="Sample rate to resample the output to (from 24KHz)")
 	parser.add_argument("--output-volume", type=float, default=default_arguments['output-volume'], help="Adjusts volume of output")
+	parser.add_argument("--results-folder", type=str, default=default_arguments['results-folder'], help="Sets output directory")
 	
 	parser.add_argument("--tts-backend", default=default_arguments['tts-backend'], help="Specifies which TTS backend to use.")
 
@@ -2137,6 +2139,7 @@ def get_default_settings( hypenated=True ):
 		'output-sample-rate': args.output_sample_rate,
 		'autocalculate-voice-chunk-duration-size': args.autocalculate_voice_chunk_duration_size,
 		'output-volume': args.output_volume,
+		'results-folder': args.results_folder,
 		
 		'tts-backend': args.tts_backend,
 
@@ -2183,6 +2186,7 @@ def update_args( **kwargs ):
 	args.output_sample_rate = 44000
 	args.autocalculate_voice_chunk_duration_size = settings['autocalculate_voice_chunk_duration_size']
 	args.output_volume = settings['output_volume']
+	args.results_folder = settings['results_folder']
 	
 	args.tts_backend = settings['tts_backend']
 	

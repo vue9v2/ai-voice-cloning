@@ -120,7 +120,7 @@ def update_training_configs():
 def history_view_results( voice ):
 	results = []
 	files = []
-	outdir = f"./results/{voice}/"
+	outdir = f"./{args.results_folder}/{voice}/"
 	for i, file in enumerate(sorted(os.listdir(outdir))):
 		if file[-4:] != ".wav":
 			continue
@@ -281,11 +281,11 @@ def update_voices():
 	return (
 		gr.Dropdown.update(choices=get_voice_list(append_defaults=True)),
 		gr.Dropdown.update(choices=get_voice_list()),
-		gr.Dropdown.update(choices=get_voice_list("./results/")),
+		gr.Dropdown.update(choices=get_voice_list(args.results_folder)),
 	)
 
 def history_copy_settings( voice, file ):
-	return import_generate_settings( f"./results/{voice}/{file}" )
+	return import_generate_settings( f"./{args.results_folder}/{voice}/{file}" )
 
 def setup_gradio():
 	global args
@@ -309,7 +309,7 @@ def setup_gradio():
 
 	voice_list_with_defaults = get_voice_list(append_defaults=True)
 	voice_list = get_voice_list()
-	result_voices = get_voice_list("./results/")
+	result_voices = get_voice_list(args.results_folder)
 	
 	autoregressive_models = get_autoregressive_models()
 	diffusion_models = get_diffusion_models()
@@ -571,6 +571,8 @@ def setup_gradio():
 					EXEC_SETTINGS['autocalculate_voice_chunk_duration_size'] = gr.Number(label="Auto-Calculate Voice Chunk Duration (in seconds)", precision=0, value=args.autocalculate_voice_chunk_duration_size)
 					EXEC_SETTINGS['output_volume'] = gr.Slider(label="Output Volume", minimum=0, maximum=2, value=args.output_volume)
 					EXEC_SETTINGS['device_override'] = gr.Textbox(label="Device Override", value=args.device_override)
+
+					EXEC_SETTINGS['results_folder'] = gr.Textbox(label="Results Folder", value=args.results_folder)
 					
 				with gr.Column():
 					# EXEC_SETTINGS['tts_backend'] = gr.Dropdown(TTSES, label="TTS Backend", value=args.tts_backend if args.tts_backend else TTSES[0])
@@ -651,7 +653,7 @@ def setup_gradio():
 			]
 		)
 		history_results_list.change(
-			fn=lambda voice, file: f"./results/{voice}/{file}",
+			fn=lambda voice, file: f"./{args.results_folder}/{voice}/{file}",
 			inputs=[
 				history_voices,
 				history_results_list,
