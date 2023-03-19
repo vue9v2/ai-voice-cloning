@@ -252,7 +252,7 @@ def generate(**kwargs):
  
 	full_start_time = time.time()
  
-	outdir = f"./{args.results_folder}/{voice}/"
+	outdir = f"{args.results_folder}/{voice}/"
 	os.makedirs(outdir, exist_ok=True)
 
 	audio_cache = {}

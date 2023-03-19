@@ -120,7 +120,7 @@ def update_training_configs():
 def history_view_results( voice ):
 	results = []
 	files = []
-	outdir = f"./{args.results_folder}/{voice}/"
+	outdir = f"{args.results_folder}/{voice}/"
 	for i, file in enumerate(sorted(os.listdir(outdir))):
 		if file[-4:] != ".wav":
 			continue
@@ -285,7 +285,7 @@ def update_voices():
 	)
 
 def history_copy_settings( voice, file ):
-	return import_generate_settings( f"./{args.results_folder}/{voice}/{file}" )
+	return import_generate_settings( f"{args.results_folder}/{voice}/{file}" )
 
 def setup_gradio():
 	global args
@@ -653,7 +653,7 @@ def setup_gradio():
 			]
 		)
 		history_results_list.change(
-			fn=lambda voice, file: f"./{args.results_folder}/{voice}/{file}",
+			fn=lambda voice, file: f"{args.results_folder}/{voice}/{file}",
 			inputs=[
 				history_voices,
 				history_results_list,
