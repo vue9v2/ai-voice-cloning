@@ -488,7 +488,7 @@ def setup_gradio():
 							)
 						with gr.Row():
 							TRAINING_SETTINGS["batch_size"] = gr.Number(label="Batch Size", value=128, precision=0)
-							TRAINING_SETTINGS["gradient_accumulation_size"] = gr.Number(label="Gradient Accumulation Size", value=4, precision=0, visible=args.tts_backend=="tortoise")
+							TRAINING_SETTINGS["gradient_accumulation_size"] = gr.Number(label="Gradient Accumulation Size", value=4, precision=0)
 						with gr.Row():
 							TRAINING_SETTINGS["save_rate"] = gr.Number(label="Save Frequency (in epochs)", value=5, precision=0)
 							TRAINING_SETTINGS["validation_rate"] = gr.Number(label="Validation Frequency (in epochs)", value=5, precision=0)
