@@ -12,6 +12,7 @@ pip3 install torch torchvision torchaudio --extra-index-url https://download.pyt
 python3 -m pip install -r ./modules/tortoise-tts/requirements.txt # install TorToiSe requirements
 python3 -m pip install -e ./modules/tortoise-tts/ # install TorToiSe
 python3 -m pip install -r ./modules/dlas/requirements.txt # instal DLAS requirements, last, because whisperx will break a dependency here
+python3 -m pip install -e ./modules/dlas/ # install DLAS
 python3 -m pip install -r ./requirements.txt # install local requirements
 
 rm *.bat

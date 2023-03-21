@@ -8,6 +8,7 @@ python -m pip install torch==1.13.1 torchvision torchaudio torch-directml
 python -m pip install -r .\modules\tortoise-tts\requirements.txt
 python -m pip install -e .\modules\tortoise-tts\
 python -m pip install -r .\modules\dlas\requirements.txt
+python -m pip install -e .\modules\dlas\
 python -m pip install -r .\requirements.txt
 
 del *.sh

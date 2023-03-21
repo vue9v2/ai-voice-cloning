@@ -6,10 +6,6 @@ import datetime
 
 from torch.distributed.run import main as torchrun
 
-# it'd be downright sugoi if I was able to install DLAS as a pip package
-sys.path.insert(0, './modules/dlas/codes/')
-sys.path.insert(0, './modules/dlas/')
-
 # this is effectively just copy pasted and cleaned up from the __main__ section of training.py
 def train(config_path, launcher='none'):
     opt = option.parse(config_path, is_train=True)
@@ -62,7 +58,7 @@ if __name__ == "__main__":
         pass
 
     import torch
-    from codes import train as tr
-    from utils import util, options as option
+    from dlas import train as tr
+    from dlas.utils import util, options as option
 
     train(config_path, args.launcher)
