@@ -192,6 +192,9 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 		gr.update(visible=j is not None),
 	)
 
+def slice_dataset_proxy( voice, trim_silence, start_offset, end_offset, progress=gr.Progress(track_tqdm=True) ):
+	return slice_dataset( voice, trim_silence=trim_silence, start_offset=start_offset, end_offset=end_offset, results=None, progress=progress )
+
 def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, trim_silence, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=False) ):
 	messages = []
 	
@@ -818,7 +821,7 @@ def setup_gradio():
 			outputs=prepare_dataset_output #console_output
 		)
 		slice_dataset_button.click(
-			slice_dataset,
+			slice_dataset_proxy,
 			inputs=[
 				DATASET_SETTINGS['voice'],
 				DATASET_SETTINGS['trim_silence'],
