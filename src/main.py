@@ -6,6 +6,8 @@ if 'TORTOISE_MODELS_DIR' not in os.environ:
 if 'TRANSFORMERS_CACHE' not in os.environ:
 	os.environ['TRANSFORMERS_CACHE'] = os.path.realpath(os.path.join(os.getcwd(), './models/transformers/'))
 
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+
 from utils import *
 from webui import *
 
