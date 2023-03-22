@@ -700,7 +700,7 @@ class TrainingState():
 		if args.tts_backend == "vall-e":
 			self.cmd = ['deepspeed', f'--num_gpus={gpus}', '--module', 'vall_e.train', f'yaml="{config_path}"']
 		else:
-			self.cmd = [f'train.{"bat" if os.name == "nt" else "sh"}', config_path]
+			self.cmd = ['train.bat', config_path] if os.name == "nt" else ['./train.sh', config_path]
 
 		print("Spawning process: ", " ".join(self.cmd))
 		self.process = subprocess.Popen(self.cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
