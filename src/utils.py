@@ -1147,6 +1147,9 @@ def whisper_sanitize( results ):
 		last_segment['text'] += segment['text']
 		last_segment['end'] = segment['end']
 
+	for i in range(len(sanitized['segments'])):
+		sanitized['segments']['id'] = i
+
 	return sanitized
 
 def whisper_transcribe( file, language=None ):
@@ -1263,10 +1266,19 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 		if basename in results and skip_existings:
 			print(f"Skipping already parsed file: {basename}")
 		else:
-			result = whisper_transcribe(file, language=language)
+			try:
+				result = whisper_transcribe(file, language=language)
+			except Exception as e:
+				print("Failed to transcribe:", file)
+				continue
 			results[basename] = result
 
-		# results[basename] = whisper_sanitize(results[basename])
+		try:
+			sanitized = whisper_sanitize(results[basename])
+			results[basename] = sanitized
+		except Exception as e:
+			print("Failed to sanitize:", basename, e)
+			pass
 
 		waveform, sample_rate = torchaudio.load(file)
 		# resample to the input rate, since it'll get resampled for training anyways
