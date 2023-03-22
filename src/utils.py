@@ -1168,7 +1168,7 @@ def whisper_transcribe( file, language=None ):
 		device = "cuda" if get_device_name() == "cuda" else "cpu"
 		if whisper_vad:
 			if args.whisper_batchsize > 1:
-				result = whisperx.transcribe_with_vad_parallel(whisper_model, file, whisper_vad, batch_size=args.whisper_batchsize)
+				result = whisperx.transcribe_with_vad_parallel(whisper_model, file, whisper_vad, batch_size=args.whisper_batchsize, language=language, task="transcribe")
 			else:
 				result = whisperx.transcribe_with_vad(whisper_model, file, whisper_vad)
 		else:
@@ -1192,6 +1192,10 @@ def whisper_transcribe( file, language=None ):
 			del result_aligned['segments'][i]['char-segments']
 
 		result['segments'] = result_aligned['segments']
+		result['text'] = []
+		for segment in result['segments']:
+			result['text'].append(segment['text'].strip())
+		result['text'] = " ".join(result['text'])
 
 		return result
 
