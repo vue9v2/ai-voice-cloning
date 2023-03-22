@@ -1150,6 +1150,7 @@ def whisper_transcribe( file, language=None ):
 		segments = whisper_model.extract_text_and_timestamps( res )
 
 		result = {
+			'text': []
 			'segments': []
 		}
 		for segment in segments:
@@ -1157,8 +1158,12 @@ def whisper_transcribe( file, language=None ):
 				'start': segment[0] / 100.0,
 				'end': segment[1] / 100.0,
 				'text': segment[2],
+				'id': len(result['segments'])
 			}
+			result['text'].append( segment[2] )
 			result['segments'].append(reparsed)
+
+		result['text'] = " ".join(result['text'])
 		return result
 
 	if args.whisper_backend == "m-bain/whisperx":
@@ -1194,6 +1199,7 @@ def whisper_transcribe( file, language=None ):
 		result['segments'] = result_aligned['segments']
 		result['text'] = []
 		for segment in result['segments']:
+			segment['id'] = len(result['text'])
 			result['text'].append(segment['text'].strip())
 		result['text'] = " ".join(result['text'])
 
