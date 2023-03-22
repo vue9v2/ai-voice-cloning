@@ -1271,11 +1271,13 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
 		basename = os.path.basename(file)
 
+		modified = False
 		if basename in results and skip_existings:
 			print(f"Skipping already parsed file: {basename}")
 		else:
 			try:
 				result = whisper_transcribe(file, language=language)
+				modified = True
 			except Exception as e:
 				print("Failed to transcribe:", file)
 				continue
@@ -1283,8 +1285,9 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 
 		try:
 			sanitized = whisper_sanitize(results[basename])
-			if len(sanitized['segments']) > 0 and len(sanitized['segments'] != results[basename]['segments']):
+			if len(sanitized['segments']) > 0 and len(sanitized['segments']) != len(results[basename]['segments']):
 				results[basename] = sanitized
+				modified = True
 				print("Segments sanizited: ", basename)
 		except Exception as e:
 			print("Failed to sanitize:", basename, e)
@@ -1298,8 +1301,9 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 			waveform = waveform[:1]
 		torchaudio.save(f"{indir}/audio/{basename}", waveform, sample_rate, encoding="PCM_S", bits_per_sample=16)
 
-		with open(infile, 'w', encoding="utf-8") as f:
-			f.write(json.dumps(results, indent='\t'))
+		if modified:
+			with open(infile, 'w', encoding="utf-8") as f:
+				f.write(json.dumps(results, indent='\t'))
 
 		do_gc()
 

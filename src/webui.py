@@ -443,8 +443,8 @@ def setup_gradio():
 						DATASET_SETTINGS['voice'] = gr.Dropdown( choices=voice_list, label="Dataset Source", type="value", value=voice_list[0] if len(voice_list) > 0 else "" )
 						with gr.Row():
 							DATASET_SETTINGS['language'] = gr.Textbox(label="Language", value="en")
-							DATASET_SETTINGS['validation_text_length'] = gr.Number(label="Validation Text Length Threshold", value=12, precision=0)
-							DATASET_SETTINGS['validation_audio_length'] = gr.Number(label="Validation Audio Length Threshold", value=1 )
+							DATASET_SETTINGS['validation_text_length'] = gr.Number(label="Validation Text Length Threshold", value=12, precision=0, visible=args.tts_backend=="tortoise")
+							DATASET_SETTINGS['validation_audio_length'] = gr.Number(label="Validation Audio Length Threshold", value=1, visible=args.tts_backend=="tortoise" )
 						with gr.Row():
 							DATASET_SETTINGS['skip'] = gr.Checkbox(label="Skip Existing", value=False)
 							DATASET_SETTINGS['slice'] = gr.Checkbox(label="Slice Segments", value=False)
