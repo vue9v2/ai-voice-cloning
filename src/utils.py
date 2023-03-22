@@ -1134,7 +1134,7 @@ def convert_to_halfp():
 
 # collapses short segments into the previous segment
 def whisper_sanitize( results ):
-	sanitized = results
+	sanitized = json.loads(json.dumps(results))
 	sanitized['segments'] = []
 
 	for segment in results['segments']:
@@ -1144,11 +1144,19 @@ def whisper_sanitize( results ):
 			continue
 
 		last_segment = sanitized['segments'][-1]
+		# segment already asimilitated it, somehow
+		if last_segment['end'] >= segment['end']:
+			continue
+		"""
+		# segment already asimilitated it, somehow
+		if last_segment['text'].endswith(segment['text']):
+			continue
+		"""
 		last_segment['text'] += segment['text']
 		last_segment['end'] = segment['end']
 
 	for i in range(len(sanitized['segments'])):
-		sanitized['segments']['id'] = i
+		sanitized['segments'][i]['id'] = i
 
 	return sanitized
 
@@ -1275,7 +1283,9 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 
 		try:
 			sanitized = whisper_sanitize(results[basename])
-			results[basename] = sanitized
+			if len(sanitized['segments']) > 0 and len(sanitized['segments'] != results[basename]['segments']):
+				results[basename] = sanitized
+				print("Segments sanizited: ", basename)
 		except Exception as e:
 			print("Failed to sanitize:", basename, e)
 			pass
