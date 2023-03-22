@@ -5,7 +5,9 @@ log_root: ./training/${voice}/finetune/logs/
 data_dirs: [./training/${voice}/valle/]
 spkr_name_getter: "lambda p: p.parts[-3]" # "lambda p: p.parts[-1].split('-')[0]"
 
-model: ${model_name}
+max_phones: 72
+
+models: '${models}'
 batch_size: ${batch_size}
 gradient_accumulation_steps: ${gradient_accumulation_size}
 eval_batch_size: ${batch_size}
@@ -13,7 +15,3 @@ eval_batch_size: ${batch_size}
 max_iter: ${iterations}
 save_ckpt_every: ${save_rate}
 eval_every: ${validation_rate}
-
-max_phones: 256
-
-sampling_temperature: 1.0
