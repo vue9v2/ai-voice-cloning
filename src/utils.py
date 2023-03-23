@@ -66,6 +66,7 @@ VALLE_ENABLED = False
 
 try:
 	from vall_e.emb.qnt import encode as valle_quantize
+	from vall_e.emb.g2p import encode as valle_phonemize
 
 	VALLE_ENABLED = True
 except Exception as e:
