@@ -1294,6 +1294,7 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 				continue
 			results[basename] = result
 
+		"""
 		try:
 			sanitized = whisper_sanitize(results[basename])
 			if len(sanitized['segments']) > 0 and len(sanitized['segments']) != len(results[basename]['segments']):
@@ -1303,6 +1304,7 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 		except Exception as e:
 			print("Failed to sanitize:", basename, e)
 			pass
+		"""
 
 		waveform, sample_rate = torchaudio.load(file)
 		# resample to the input rate, since it'll get resampled for training anyways
