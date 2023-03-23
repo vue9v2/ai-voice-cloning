@@ -1487,6 +1487,11 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 	lines = { 'training': [], 'validation': [] }
 	segments = {}
 
+	# I'm not sure how the VALL-E implementation decides what's validation and what's not
+	if args.tts_backend == "vall-e":
+		text_length = 0
+		audio_length = 0
+
 	for filename in enumerate_progress(results, desc="Parsing results", progress=progress):
 		use_segment = use_segments
 
@@ -1647,7 +1652,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 
 		quantized = valle_quantize( waveform, sample_rate ).cpu()
 		torch.save(quantized, qnt_file)
-		print("Quantized:", file)
+		print("Quantized:", qnt_file)
 
 	for i in enumerate_progress(range(len(jobs['phonemize'][0])), desc="Phonemizing", progress=progress):
 		phn_file = jobs['phonemize'][0][i]
@@ -1655,7 +1660,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 
 		phonemized = valle_phonemize( normalized )
 		open(phn_file, 'w', encoding='utf-8').write(" ".join(phonemized))
-		print("Phonemized:", file)
+		print("Phonemized:", phn_file)
 
 	training_joined = "\n".join(lines['training'])
 	validation_joined = "\n".join(lines['validation'])
