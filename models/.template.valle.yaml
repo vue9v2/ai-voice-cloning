@@ -1,7 +1,3 @@
-data_root: ./training/${voice}/
-ckpt_root: ./training/${voice}/ckpt/
-log_root: ./training/${voice}/logs/
-
 data_dirs: [./training/${voice}/valle/]
 spkr_name_getter: "lambda p: p.parts[-3]" # "lambda p: p.parts[-1].split('-')[0]"
 
