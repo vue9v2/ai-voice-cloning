@@ -551,6 +551,16 @@ def setup_gradio():
 							width=500,
 							height=350,
 						)
+						training_grad_norm_graph = gr.LinePlot(label="Training Metrics",
+							x="epoch",
+							y="value",
+							title="Gradient Normals",
+							color="type",
+							tooltip=['epoch', 'it', 'value', 'type'],
+							width=500,
+							height=350,
+							visible=args.tts_backend=="vall-e"
+						)
 						view_losses = gr.Button(value="View Losses")
 		with gr.Tab("Settings"):
 			with gr.Row():
@@ -781,6 +791,7 @@ def setup_gradio():
 			outputs=[
 				training_loss_graph,
 				training_lr_graph,
+				training_grad_norm_graph,
 			],
 			show_progress=False,
 		)
@@ -793,6 +804,7 @@ def setup_gradio():
 			outputs=[
 				training_loss_graph,
 				training_lr_graph,
+				training_grad_norm_graph,
 			],
 		)
 
