@@ -527,10 +527,16 @@ def setup_gradio():
 						verbose_training = gr.Checkbox(label="Verbose Console Output", value=True)
 						
 						keep_x_past_checkpoints = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
+						
+						with gr.Row():
+							training_graph_x_lim = gr.Number(label="X Limit", precision=0, value=0)
+							training_graph_y_lim = gr.Number(label="Y Limit", precision=0, value=0)
+
 						with gr.Row():
 							start_training_button = gr.Button(value="Train")
 							stop_training_button = gr.Button(value="Stop")
 							reconnect_training_button = gr.Button(value="Reconnect")
+						
 						
 					with gr.Column():
 						training_loss_graph = gr.LinePlot(label="Training Metrics",
@@ -562,6 +568,7 @@ def setup_gradio():
 							visible=args.tts_backend=="vall-e"
 						)
 						view_losses = gr.Button(value="View Losses")
+
 		with gr.Tab("Settings"):
 			with gr.Row():
 				exec_inputs = []
@@ -787,7 +794,10 @@ def setup_gradio():
 		)
 		training_output.change(
 			fn=update_training_dataplot,
-			inputs=None,
+			inputs=[
+				training_graph_x_lim,
+				training_graph_y_lim,
+			],
 			outputs=[
 				training_loss_graph,
 				training_lr_graph,
@@ -799,7 +809,9 @@ def setup_gradio():
 		view_losses.click(
 			fn=update_training_dataplot,
 			inputs=[
-				training_configs
+				training_graph_x_lim,
+				training_graph_y_lim,
+				training_configs,
 			],
 			outputs=[
 				training_loss_graph,
