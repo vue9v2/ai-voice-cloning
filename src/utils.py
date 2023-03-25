@@ -726,17 +726,20 @@ class TrainingState():
 			else:
 				return
 
+		if 'elapsed_time' in self.info:
+			self.info['iteration_rate'] = self.info['elapsed_time']
+			del self.info['elapsed_time']
+
 		self.info = data
 		if 'epoch' in self.info:
 			self.epoch = int(self.info['epoch'])
 		if 'it' in self.info:
 			self.it = int(self.info['it'])
-		if 'iteration' in self.info:
-			self.it = int(self.info['iteration'])
 		if 'step' in self.info:
 			self.step = int(self.info['step'])
 		if 'steps' in self.info:
 			self.steps = int(self.info['steps'])
+
 
 		if 'iteration_rate' in self.info:
 			it_rate = self.info['iteration_rate']
@@ -905,14 +908,9 @@ class TrainingState():
 				else:
 					continue
 
-				if args.tts_backend == "tortoise":
-					if "it" not in data:
-						continue
-					it = data['it']
-				else:
-					if "iteration" not in data:
-						continue
-					it = data['iteration']
+				if "it" not in data:
+					continue
+				it = data['it']
 				
 				# this method should have it at least 
 				unq[f'{it}'] = data
