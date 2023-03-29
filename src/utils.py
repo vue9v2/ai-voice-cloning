@@ -2862,3 +2862,49 @@ def unload_whisper():
 		print("Unloaded Whisper")
 
 	do_gc()	
+
+# shamelessly borrowed from Voldy's Web UI: https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/modules/extras.py#L74
+def merge_models( primary_model_name, secondary_model_name, alpha, progress=gr.Progress() ):
+	key_blacklist = []
+
+	def weighted_sum(theta0, theta1, alpha):
+		return ((1 - alpha) * theta0) + (alpha * theta1)
+
+	def read_model( filename ):
+		print(f"Loading {filename}")
+		return torch.load(filename)
+
+	theta_func = weighted_sum
+
+	theta_0 = read_model(primary_model_name)
+	theta_1 = read_model(secondary_model_name)
+
+	for key in enumerate_progress(theta_0.keys(), desc="Merging...", progress=progress):
+		if key in key_blacklist:
+			print("Skipping ignored key:", key)
+			continue
+		
+		a = theta_0[key]
+		b = theta_1[key]
+
+		if a.dtype != torch.float32 and a.dtype != torch.float16:
+			print("Skipping key:", key, a.dtype)
+			continue
+
+		if b.dtype != torch.float32 and b.dtype != torch.float16:
+			print("Skipping key:", key, b.dtype)
+			continue
+
+		theta_0[key] = theta_func(a, b, alpha)
+
+	del theta_1
+
+	primary_basename = os.path.splitext(os.path.basename(primary_model_name))[0]
+	secondary_basename = os.path.splitext(os.path.basename(secondary_model_name))[0]
+	suffix = "{:.3f}".format(alpha)
+	output_path = f'./models/finetunes/{primary_basename}_{secondary_basename}_{suffix}_merge.pth'
+
+	torch.save(theta_0, output_path)
+	message = f"Saved to {output_path}"
+	print(message)
+	return message

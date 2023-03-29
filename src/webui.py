@@ -27,6 +27,7 @@ GENERATE_SETTINGS = {}
 TRANSCRIBE_SETTINGS = {}
 EXEC_SETTINGS = {}
 TRAINING_SETTINGS = {}
+MERGER_SETTINGS = {}
 GENERATE_SETTINGS_ARGS = []
 
 PRESETS = {
@@ -359,7 +360,7 @@ def setup_gradio():
 					GENERATE_SETTINGS["candidates"] = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates")
 					GENERATE_SETTINGS["seed"] = gr.Number(value=0, precision=0, label="Seed")
 
-					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value" )
+					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value", value="Ultra Fast" )
 
 					GENERATE_SETTINGS["num_autoregressive_samples"] = gr.Slider(value=16, minimum=2, maximum=512, step=1, label="Samples")
 					GENERATE_SETTINGS["diffusion_iterations"] = gr.Slider(value=30, minimum=0, maximum=512, step=1, label="Iterations")
@@ -435,6 +436,17 @@ def setup_gradio():
 
 				with gr.Row():
 					text_tokenizier_button = gr.Button(value="Tokenize Text")
+			with gr.Tab("Model Merger"):
+				with gr.Column():
+					with gr.Row():
+						MERGER_SETTINGS["model_a"] = gr.Dropdown( choices=autoregressive_models, label="Model A", type="value", value=autoregressive_models[0] )
+						MERGER_SETTINGS["model_b"] = gr.Dropdown( choices=autoregressive_models, label="Model B", type="value", value=autoregressive_models[0] )
+					with gr.Row():
+						MERGER_SETTINGS["weight_slider"] = gr.Slider(label="Weight (from A to B)", value=0.5, minimum=0, maximum=1)
+					with gr.Row():
+						merger_button = gr.Button(value="Run Merger")
+				with gr.Column():
+					merger_output = gr.TextArea(label="Console Output", max_lines=8)
 		with gr.Tab("Training"):
 			with gr.Tab("Prepare Dataset"):
 				with gr.Row():
@@ -775,6 +787,11 @@ def setup_gradio():
 		text_tokenizier_button.click(tokenize_text,
 			inputs=text_tokenizier_input,
 			outputs=text_tokenizier_output
+		)
+
+		merger_button.click(merge_models,
+			inputs=list(MERGER_SETTINGS.values()),
+			outputs=merger_output
 		)
 
 		refresh_configs.click(
