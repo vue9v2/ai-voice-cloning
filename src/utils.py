@@ -2087,7 +2087,7 @@ def get_voice_list(dir=get_voice_dir(), append_defaults=False):
 	return res
 
 
-def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
+def get_autoregressive_models(dir="./models/finetunes/", prefixed=False, auto=False):
 	os.makedirs(dir, exist_ok=True)
 	base = [get_model_path('autoregressive.pth')]
 	halfp = get_halfp_model_path()
@@ -2112,7 +2112,11 @@ def get_autoregressive_models(dir="./models/finetunes/", prefixed=False):
 
 			res[i] = f'[{shorthash}] {path}'
 
-	return ["auto"] + relative_paths(res)
+	paths = relative_paths(res)
+	if auto:
+		paths = ["auto"] + paths 
+
+	return paths
 
 def get_diffusion_models(dir="./models/finetunes/", prefixed=False):
 	return relative_paths([ get_model_path('diffusion_decoder.pth') ])
