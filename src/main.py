@@ -21,7 +21,7 @@ if __name__ == "__main__":
 		webui = setup_gradio()
 		webui.launch(share=args.share, prevent_thread_lock=True, show_error=True, server_name=args.listen_host, server_port=args.listen_port)
 		if not args.defer_tts_load:
-			tts = setup_tortoise()
+			tts = load_tts()
 
 		webui.block_thread()
 elif __name__ == "main":
@@ -37,4 +37,4 @@ elif __name__ == "main":
 	app = gr.mount_gradio_app(app, webui, path=args.listen_path)
 
 	if not args.defer_tts_load:
-		tts = setup_tortoise()
+		tts = load_tts()
