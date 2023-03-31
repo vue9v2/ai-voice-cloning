@@ -315,6 +315,8 @@ def setup_gradio():
 	voice_list = get_voice_list()
 	result_voices = get_voice_list(args.results_folder)
 	
+	valle_models = get_valle_models()
+
 	autoregressive_models = get_autoregressive_models()
 	diffusion_models = get_diffusion_models()
 	tokenizer_jsons = get_tokenizer_jsons()
@@ -337,11 +339,11 @@ def setup_gradio():
 				with gr.Column():
 					GENERATE_SETTINGS["delimiter"] = gr.Textbox(lines=1, label="Line Delimiter", placeholder="\\n")
 
-					GENERATE_SETTINGS["emotion"] = gr.Radio( ["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom", "None"], value="None", label="Emotion", type="value", interactive=True )
+					GENERATE_SETTINGS["emotion"] = gr.Radio( ["Happy", "Sad", "Angry", "Disgusted", "Arrogant", "Custom", "None"], value="None", label="Emotion", type="value", interactive=True, visible=args.tts_backend=="tortoise" )
 					GENERATE_SETTINGS["prompt"] = gr.Textbox(lines=1, label="Custom Emotion", visible=False)
 					GENERATE_SETTINGS["voice"] = gr.Dropdown(choices=voice_list_with_defaults, label="Voice", type="value", value=voice_list_with_defaults[0]) # it'd be very cash money if gradio was able to default to the first value in the list without this shit
 					GENERATE_SETTINGS["mic_audio"] = gr.Audio( label="Microphone Source", source="microphone", type="filepath", visible=False )
-					GENERATE_SETTINGS["voice_latents_chunks"] = gr.Number(label="Voice Chunks", precision=0, value=0)
+					GENERATE_SETTINGS["voice_latents_chunks"] = gr.Number(label="Voice Chunks", precision=0, value=0, visible=args.tts_backend=="tortoise")
 					with gr.Row():
 						refresh_voices = gr.Button(value="Refresh Voice List")
 						recompute_voice_latents = gr.Button(value="(Re)Compute Voice Latents")
@@ -357,17 +359,17 @@ def setup_gradio():
 						outputs=GENERATE_SETTINGS["mic_audio"],
 					)
 				with gr.Column():
-					GENERATE_SETTINGS["candidates"] = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates")
+					GENERATE_SETTINGS["candidates"] = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates", visible=args.tts_backend=="tortoise")
 					GENERATE_SETTINGS["seed"] = gr.Number(value=0, precision=0, label="Seed")
 
 					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value", value="Ultra Fast" )
 
 					GENERATE_SETTINGS["num_autoregressive_samples"] = gr.Slider(value=16, minimum=2, maximum=512, step=1, label="Samples")
-					GENERATE_SETTINGS["diffusion_iterations"] = gr.Slider(value=30, minimum=0, maximum=512, step=1, label="Iterations")
+					GENERATE_SETTINGS["diffusion_iterations"] = gr.Slider(value=30, minimum=0, maximum=512, step=1, label="Iterations", visible=args.tts_backend=="tortoise")
 
 					GENERATE_SETTINGS["temperature"] = gr.Slider(value=0.2, minimum=0, maximum=1, step=0.1, label="Temperature")
 					
-					show_experimental_settings = gr.Checkbox(label="Show Experimental Settings")
+					show_experimental_settings = gr.Checkbox(label="Show Experimental Settings", visible=args.tts_backend=="tortoise")
 					reset_generate_settings_button = gr.Button(value="Reset to Default")
 				with gr.Column(visible=False) as col:
 					experimental_column = col
@@ -606,10 +608,12 @@ def setup_gradio():
 					EXEC_SETTINGS['device_override'] = gr.Textbox(label="Device Override", value=args.device_override)
 
 					EXEC_SETTINGS['results_folder'] = gr.Textbox(label="Results Folder", value=args.results_folder)
-					
-				with gr.Column():
 					# EXEC_SETTINGS['tts_backend'] = gr.Dropdown(TTSES, label="TTS Backend", value=args.tts_backend if args.tts_backend else TTSES[0])
+					
+				with gr.Column(visible=args.tts_backend=="vall-e"):
+					EXEC_SETTINGS['valle_model'] = gr.Dropdown(choices=valle_models, label="VALL-E Model Config", value=args.valle_model if args.valle_model else valle_models[0])
 
+				with gr.Column(visible=args.tts_backend=="tortoise"):
 					EXEC_SETTINGS['autoregressive_model'] = gr.Dropdown(choices=["auto"] + autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else "auto")
 					EXEC_SETTINGS['diffusion_model'] = gr.Dropdown(choices=diffusion_models, label="Diffusion Model", value=args.diffusion_model if args.diffusion_model else diffusion_models[0])
 					EXEC_SETTINGS['vocoder_model'] = gr.Dropdown(VOCODERS, label="Vocoder", value=args.vocoder_model if args.vocoder_model else VOCODERS[-1])
