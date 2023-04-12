@@ -196,6 +196,50 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 def slice_dataset_proxy( voice, trim_silence, start_offset, end_offset, progress=gr.Progress(track_tqdm=True) ):
 	return slice_dataset( voice, trim_silence=trim_silence, start_offset=start_offset, end_offset=end_offset, results=None, progress=progress )
 
+def diarize_dataset( voice, progress=gr.Progress(track_tqdm=False) ):
+	from pyannote.audio import Pipeline
+	pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=args.hf_token)
+
+	messages = []
+	files = sorted( get_voices(load_latents=False)[voice] )
+	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
+		diarization = pipeline(file)
+		for turn, _, speaker in diarization.itertracks(yield_label=True):
+			message = f"start={turn.start:.1f}s stop={turn.end:.1f}s speaker_{speaker}"
+			print(message)
+			messages.append(message)
+
+	return "\n".join(messages)
+
+def prepare_all_datasets( language, validation_text_length, validation_audio_length, skip_existings, slice_audio, trim_silence, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=False) ):
+	kwargs = locals()
+
+	messages = []
+	voices = get_voice_list()
+
+	"""
+	for voice in voices:
+		message = prepare_dataset_proxy(voice, **kwargs)
+		messages.append(message)
+	"""
+	for voice in voices:
+		print("Processing:", voice)
+		message = transcribe_dataset( voice=voice, language=language, skip_existings=skip_existings, progress=progress )
+		messages.append(message)
+
+	if slice_audio:
+		for voice in voices:
+			print("Processing:", voice)
+			message = slice_dataset( voice, trim_silence=trim_silence, start_offset=slice_start_offset, end_offset=slice_end_offset, results=None, progress=progress )
+			messages.append(message)
+
+	for voice in voices:
+		print("Processing:", voice)
+		message = prepare_dataset( voice, use_segments=slice_audio, text_length=validation_text_length, audio_length=validation_audio_length, progress=progress )
+		messages.append(message)
+
+	return "\n".join(messages)
+
 def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, trim_silence, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=False) ):
 	messages = []
 	
@@ -468,6 +512,8 @@ def setup_gradio():
 							DATASET_SETTINGS['slice_end_offset'] = gr.Number(label="Slice End Offset", value=0)
 
 						transcribe_button = gr.Button(value="Transcribe and Process")
+						transcribe_all_button = gr.Button(value="Transcribe All")
+						diarize_button = gr.Button(value="Diarize")
 						
 						with gr.Row():
 							slice_dataset_button = gr.Button(value="(Re)Slice Audio")
@@ -579,7 +625,7 @@ def setup_gradio():
 							tooltip=['epoch', 'it', 'value', 'type'],
 							width=500,
 							height=350,
-							visible=args.tts_backend=="vall-e"
+							visible=False, # args.tts_backend=="vall-e"
 						)
 						view_losses = gr.Button(value="View Losses")
 
@@ -611,10 +657,7 @@ def setup_gradio():
 					# EXEC_SETTINGS['tts_backend'] = gr.Dropdown(TTSES, label="TTS Backend", value=args.tts_backend if args.tts_backend else TTSES[0])
 					
 				with gr.Column(visible=args.tts_backend=="vall-e"):
-					default_valle_model_choice = ""
-					if len(valle_models):
-						default_valle_model_choice = valle_models[0]
-					EXEC_SETTINGS['valle_model'] = gr.Dropdown(choices=valle_models, label="VALL-E Model Config", value=args.valle_model if args.valle_model else default_valle_model_choice)
+					EXEC_SETTINGS['valle_model'] = gr.Dropdown(choices=valle_models, label="VALL-E Model Config", value=args.valle_model if args.valle_model else valle_models[0])
 
 				with gr.Column(visible=args.tts_backend=="tortoise"):
 					EXEC_SETTINGS['autoregressive_model'] = gr.Dropdown(choices=["auto"] + autoregressive_models, label="Autoregressive Model", value=args.autoregressive_model if args.autoregressive_model else "auto")
@@ -857,6 +900,16 @@ def setup_gradio():
 		transcribe_button.click(
 			prepare_dataset_proxy,
 			inputs=dataset_settings,
+			outputs=prepare_dataset_output #console_output
+		)
+		transcribe_all_button.click(
+			prepare_all_datasets,
+			inputs=dataset_settings[1:],
+			outputs=prepare_dataset_output #console_output
+		)
+		diarize_button.click(
+			diarize_dataset,
+			inputs=dataset_settings[0],
 			outputs=prepare_dataset_output #console_output
 		)
 		prepare_dataset_button.click(

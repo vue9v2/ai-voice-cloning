@@ -75,6 +75,7 @@ try:
 
 	VALLE_ENABLED = True
 except Exception as e:
+	print(e)
 	pass
 
 if VALLE_ENABLED:
@@ -156,10 +157,12 @@ def generate_valle(**kwargs):
 
 	voice_cache = {}
 	def fetch_voice( voice ):
-		voice_dir = f'./voices/{voice}/'
+		voice_dir = f'./training/{voice}/audio/'
+		if not os.path.isdir(voice_dir):
+			voice_dir = f'./voices/{voice}/'
 		files = [ f'{voice_dir}/{d}' for d in os.listdir(voice_dir) if d[-4:] == ".wav" ]
-		return files
-		# return random.choice(files)
+		# return files
+		return random.choice(files)
 
 	def get_settings( override=None ):
 		settings = {
@@ -1089,13 +1092,13 @@ class TrainingState():
 					'ar-quarter.lr', 'nar-quarter.lr',
 				]
 				keys['losses'] = [
-					'ar.loss', 'nar.loss',
-					'ar-half.loss', 'nar-half.loss',
-					'ar-quarter.loss', 'nar-quarter.loss',
+					'ar.loss', 'nar.loss', 'ar+nar.loss',
+					'ar-half.loss', 'nar-half.loss', 'ar-half+nar-half.loss',
+					'ar-quarter.loss', 'nar-quarter.loss', 'ar-quarter+nar-quarter.loss',
 
-					'ar.loss.nll', 'nar.loss.nll',
-					'ar-half.loss.nll', 'nar-half.loss.nll',
-					'ar-quarter.loss.nll', 'nar-quarter.loss.nll',
+				#	'ar.loss.nll', 'nar.loss.nll',
+				#	'ar-half.loss.nll', 'nar-half.loss.nll',
+				#	'ar-quarter.loss.nll', 'nar-quarter.loss.nll',
 				]
 
 				keys['accuracies'] = [
@@ -1123,7 +1126,7 @@ class TrainingState():
 
 				prefix = ""
 
-				if data["mode"] == "validation":
+				if "mode" in self.info and self.info["mode"] == "validation":
 					prefix = f'{self.info["name"] if "name" in self.info else "val"}_'
 
 				self.statistics['loss'].append({'epoch': epoch, 'it': self.it, 'value': self.info[k], 'type': f'{prefix}{k}' })
@@ -1231,6 +1234,7 @@ class TrainingState():
 
 		unq = {}
 		averager = None
+		prev_state = 0
 
 		for log in logs:
 			with open(log, 'r', encoding="utf-8") as f:
@@ -1250,6 +1254,7 @@ class TrainingState():
 					
 					name = "train"
 					mode = "training"
+					prev_state = 0
 				elif line.find('Validation Metrics:') >= 0:
 					data = json.loads(line.split("Validation Metrics:")[-1])
 					if "it" not in data:
@@ -1257,8 +1262,15 @@ class TrainingState():
 					if "epoch" not in data:
 						data['epoch'] = epoch
 
-					name = data['name'] if 'name' in data else "val"
+					# name = data['name'] if 'name' in data else "val"
 					mode = "validation"
+
+					if prev_state == 0:
+						name = "subtrain"
+					else:
+						name = "val"
+
+					prev_state += 1
 				else:
 					continue
 
@@ -1272,6 +1284,7 @@ class TrainingState():
 					if not averager or averager['key'] != f'{it}_{name}' or averager['mode'] != mode:
 						averager = {
 							'key': f'{it}_{name}',
+							'name': name,
 							'mode': mode,
 							"metrics": {}
 						}
@@ -1292,11 +1305,13 @@ class TrainingState():
 				if update and it <= self.last_info_check_at:
 					continue
 		
+		blacklist = [ "batch", "eval" ]
 		for it in unq:
 			if args.tts_backend == "vall-e":
 				stats = unq[it]
-				data = {k: sum(v) / len(v) for k, v in stats['metrics'].items()}
-				data['mode'] = stats
+				data = {k: sum(v) / len(v) for k, v in stats['metrics'].items() if k not in blacklist }
+				data['name'] = stats['name']
+				data['mode'] = stats['mode']
 				data['steps'] = len(stats['metrics']['it'])
 			else:
 				data = unq[it]
@@ -1633,6 +1648,7 @@ def whisper_transcribe( file, language=None ):
 
 		device = "cuda" if get_device_name() == "cuda" else "cpu"
 		if whisper_vad:
+			# omits a considerable amount of the end
 			"""
 			if args.whisper_batchsize > 1:
 				result = whisperx.transcribe_with_vad_parallel(whisper_model, file, whisper_vad, batch_size=args.whisper_batchsize, language=language, task="transcribe")
@@ -1778,7 +1794,9 @@ def slice_dataset( voice, trim_silence=True, start_offset=0, end_offset=0, resul
 	messages = []
 
 	if not os.path.exists(infile):
-		raise Exception(f"Missing dataset: {infile}")
+		message = f"Missing dataset: {infile}"
+		print(message)
+		return message
 
 	if results is None:
 		results = json.load(open(infile, 'r', encoding="utf-8"))
@@ -1903,7 +1921,9 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
 	if not os.path.exists(infile):
-		raise Exception(f"Missing dataset: {infile}")
+		message = f"Missing dataset: {infile}"
+		print(message)
+		return message
 
 	results = json.load(open(infile, 'r', encoding="utf-8"))
 
