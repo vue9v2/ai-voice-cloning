@@ -513,7 +513,7 @@ def setup_gradio():
 
 						transcribe_button = gr.Button(value="Transcribe and Process")
 						transcribe_all_button = gr.Button(value="Transcribe All")
-						diarize_button = gr.Button(value="Diarize")
+						diarize_button = gr.Button(value="Diarize", visible=False)
 						
 						with gr.Row():
 							slice_dataset_button = gr.Button(value="(Re)Slice Audio")
