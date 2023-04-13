@@ -75,7 +75,6 @@ try:
 
 	VALLE_ENABLED = True
 except Exception as e:
-	print(e)
 	pass
 
 if VALLE_ENABLED:
