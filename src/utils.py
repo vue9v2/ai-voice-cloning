@@ -32,6 +32,7 @@ import gradio as gr
 import gradio.utils
 import pandas as pd
 
+from glob import glob
 from datetime import datetime
 from datetime import timedelta
 
@@ -1709,7 +1710,7 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 
 	results = {}
 
-	files = sorted( get_voices(load_latents=False)[voice] )
+	files = get_voice(voice, load_latents=False)
 	indir = f'./training/{voice}/'
 	infile = f'{indir}/whisper.json'
 	
@@ -2104,9 +2105,15 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 		phn_file = jobs['phonemize'][0][i]
 		normalized = jobs['phonemize'][1][i]
 
-		phonemized = valle_phonemize( normalized )
-		open(phn_file, 'w', encoding='utf-8').write(" ".join(phonemized))
-		print("Phonemized:", phn_file)
+		try:
+			phonemized = valle_phonemize( normalized )
+			open(phn_file, 'w', encoding='utf-8').write(" ".join(phonemized))
+			print("Phonemized:", phn_file)
+		except Exception as e:
+			message = f"Failed to phonemize: {phn_file}: {normalized}"
+			messages.append(message)
+			print(message)
+
 
 	training_joined = "\n".join(lines['training'])
 	validation_joined = "\n".join(lines['validation'])
@@ -2431,12 +2438,47 @@ def import_voices(files, saveAs=None, progress=None):
 def relative_paths( dirs ):
 	return [ './' + os.path.relpath( d ).replace("\\", "/") for d in dirs ]
 
+def get_voice( name, dir=get_voice_dir(), load_latents=True ):
+	subj = f'{dir}/{name}/'
+	if not os.path.isdir(subj):
+		return
+
+	voice = list(glob(f'{subj}/*.wav')) + list(glob(f'{subj}/*.mp3')) + list(glob(f'{subj}/*.flac'))
+	if load_latents:
+		voice = voice + list(glob(f'{subj}/*.pth'))
+	return sorted( voice )
+
 def get_voice_list(dir=get_voice_dir(), append_defaults=False):
 	defaults = [ "random", "microphone" ]
 	os.makedirs(dir, exist_ok=True)
-	res = sorted([d for d in os.listdir(dir) if d not in defaults and os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
+	#res = sorted([d for d in os.listdir(dir) if d not in defaults and os.path.isdir(os.path.join(dir, d)) and len(os.listdir(os.path.join(dir, d))) > 0 ])
+
+	res = []
+	for name in os.listdir(dir):
+		if name in defaults:
+			continue
+		if not os.path.isdir(f'{dir}/{name}'):
+			continue
+		if len(os.listdir(os.path.join(dir, name))) == 0:
+			continue
+		files = get_voice( name, dir=dir )
+
+		if len(files) > 0:
+			res.append(name)
+		else:
+			for subdir in os.listdir(f'{dir}/{name}'):
+				if not os.path.isdir(f'{dir}/{name}/{subdir}'):
+					continue
+				files = get_voice( f'{name}/{subdir}', dir=dir )
+				if len(files) == 0:
+					continue
+				res.append(f'{name}/{subdir}')
+
+	res = sorted(res)
+	
 	if append_defaults:
 		res = res + defaults
+	
 	return res
 
 def get_valle_models(dir="./training/"):

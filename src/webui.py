@@ -201,7 +201,7 @@ def diarize_dataset( voice, progress=gr.Progress(track_tqdm=False) ):
 	pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=args.hf_token)
 
 	messages = []
-	files = sorted( get_voices(load_latents=False)[voice] )
+	files = get_voice(voice, load_latents=False)
 	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
 		diarization = pipeline(file)
 		for turn, _, speaker in diarization.itertracks(yield_label=True):
@@ -219,13 +219,10 @@ def prepare_all_datasets( language, validation_text_length, validation_audio_len
 
 	"""
 	for voice in voices:
-		message = prepare_dataset_proxy(voice, **kwargs)
-		messages.append(message)
-	"""
-	for voice in voices:
 		print("Processing:", voice)
 		message = transcribe_dataset( voice=voice, language=language, skip_existings=skip_existings, progress=progress )
 		messages.append(message)
+	"""
 
 	if slice_audio:
 		for voice in voices:
