@@ -495,7 +495,7 @@ def setup_gradio():
 						merger_button = gr.Button(value="Run Merger")
 				with gr.Column():
 					merger_output = gr.TextArea(label="Console Output", max_lines=8)
-		with gr.Tab("Training", visible=args.tts_backend != "bark"):
+		with gr.Tab("Training"):
 			with gr.Tab("Prepare Dataset"):
 				with gr.Row():
 					with gr.Column():
@@ -528,7 +528,7 @@ def setup_gradio():
 						dataset_settings = list(DATASET_SETTINGS.values())
 					with gr.Column():
 						prepare_dataset_output = gr.TextArea(label="Console Output", interactive=False, max_lines=8)
-			with gr.Tab("Generate Configuration"):
+			with gr.Tab("Generate Configuration", visible=args.tts_backend != "bark"):
 				with gr.Row():
 					with gr.Column():
 						TRAINING_SETTINGS["epochs"] = gr.Number(label="Epochs", value=500, precision=0)
@@ -580,7 +580,7 @@ def setup_gradio():
 						with gr.Row():
 							training_optimize_configuration = gr.Button(value="Validate Training Configuration")
 							training_save_configuration = gr.Button(value="Save Training Configuration")
-			with gr.Tab("Run Training"):
+			with gr.Tab("Run Training", visible=args.tts_backend != "bark"):
 				with gr.Row():
 					with gr.Column():
 						training_configs = gr.Dropdown(label="Training Configuration", choices=training_list, value=training_list[0] if len(training_list) else "")
