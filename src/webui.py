@@ -167,6 +167,10 @@ def reset_generate_settings_proxy():
 	return tuple(res)
 
 def compute_latents_proxy(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
+	if args.tts_backend == "bark":
+		global tts
+		tts.create_voice( voice )
+		return voice
 	compute_latents( voice=voice, voice_latents_chunks=voice_latents_chunks, progress=progress )
 	return voice
 
@@ -222,13 +226,13 @@ def prepare_all_datasets( language, validation_text_length, validation_audio_len
 		print("Processing:", voice)
 		message = transcribe_dataset( voice=voice, language=language, skip_existings=skip_existings, progress=progress )
 		messages.append(message)
-	"""
 
 	if slice_audio:
 		for voice in voices:
 			print("Processing:", voice)
 			message = slice_dataset( voice, trim_silence=trim_silence, start_offset=slice_start_offset, end_offset=slice_end_offset, results=None, progress=progress )
 			messages.append(message)
+	"""
 
 	for voice in voices:
 		print("Processing:", voice)
@@ -400,12 +404,13 @@ def setup_gradio():
 						outputs=GENERATE_SETTINGS["mic_audio"],
 					)
 				with gr.Column():
+					preset = None						
 					GENERATE_SETTINGS["candidates"] = gr.Slider(value=1, minimum=1, maximum=6, step=1, label="Candidates", visible=args.tts_backend=="tortoise")
-					GENERATE_SETTINGS["seed"] = gr.Number(value=0, precision=0, label="Seed")
+					GENERATE_SETTINGS["seed"] = gr.Number(value=0, precision=0, label="Seed", visible=args.tts_backend!="tortoise")
 
-					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value", value="Ultra Fast" )
+					preset = gr.Radio( ["Ultra Fast", "Fast", "Standard", "High Quality"], label="Preset", type="value", value="Ultra Fast", visible=args.tts_backend=="tortoise" )
 
-					GENERATE_SETTINGS["num_autoregressive_samples"] = gr.Slider(value=16, minimum=2, maximum=512, step=1, label="Samples")
+					GENERATE_SETTINGS["num_autoregressive_samples"] = gr.Slider(value=16, minimum=2, maximum=512, step=1, label="Samples", visible=args.tts_backend!="bark")
 					GENERATE_SETTINGS["diffusion_iterations"] = gr.Slider(value=30, minimum=0, maximum=512, step=1, label="Iterations", visible=args.tts_backend=="tortoise")
 
 					GENERATE_SETTINGS["temperature"] = gr.Slider(value=0.2, minimum=0, maximum=1, step=0.1, label="Temperature")
@@ -490,7 +495,7 @@ def setup_gradio():
 						merger_button = gr.Button(value="Run Merger")
 				with gr.Column():
 					merger_output = gr.TextArea(label="Console Output", max_lines=8)
-		with gr.Tab("Training"):
+		with gr.Tab("Training", visible=args.tts_backend != "bark"):
 			with gr.Tab("Prepare Dataset"):
 				with gr.Row():
 					with gr.Column():
@@ -586,8 +591,10 @@ def setup_gradio():
 						keep_x_past_checkpoints = gr.Slider(label="Keep X Previous States", minimum=0, maximum=8, value=0, step=1)
 						
 						with gr.Row():
-							training_graph_x_lim = gr.Number(label="X Limit", precision=0, value=0)
-							training_graph_y_lim = gr.Number(label="Y Limit", precision=0, value=0)
+							training_graph_x_min = gr.Number(label="X Min", precision=0, value=0)
+							training_graph_x_max = gr.Number(label="X Max", precision=0, value=0)
+							training_graph_y_min = gr.Number(label="Y Min", precision=0, value=0)
+							training_graph_y_max = gr.Number(label="Y Max", precision=0, value=0)
 
 						with gr.Row():
 							start_training_button = gr.Button(value="Train")
@@ -597,7 +604,7 @@ def setup_gradio():
 						
 					with gr.Column():
 						training_loss_graph = gr.LinePlot(label="Training Metrics",
-							x="epoch",
+							x="it", # x="epoch",
 							y="value",
 							title="Loss Metrics",
 							color="type",
@@ -606,7 +613,7 @@ def setup_gradio():
 							height=350,
 						)
 						training_lr_graph = gr.LinePlot(label="Training Metrics",
-							x="epoch",
+							x="it", # x="epoch",
 							y="value",
 							title="Learning Rate",
 							color="type",
@@ -615,7 +622,7 @@ def setup_gradio():
 							height=350,
 						)
 						training_grad_norm_graph = gr.LinePlot(label="Training Metrics",
-							x="epoch",
+							x="it", # x="epoch",
 							y="value",
 							title="Gradient Normals",
 							color="type",
@@ -765,13 +772,14 @@ def setup_gradio():
 			inputs=show_experimental_settings,
 			outputs=experimental_column
 		)
-		preset.change(fn=update_presets,
-			inputs=preset,
-			outputs=[
-				GENERATE_SETTINGS['num_autoregressive_samples'],
-				GENERATE_SETTINGS['diffusion_iterations'],
-			],
-		)
+		if preset:
+			preset.change(fn=update_presets,
+				inputs=preset,
+				outputs=[
+					GENERATE_SETTINGS['num_autoregressive_samples'],
+					GENERATE_SETTINGS['diffusion_iterations'],
+				],
+			)
 
 		recompute_voice_latents.click(compute_latents_proxy,
 			inputs=[
@@ -860,8 +868,10 @@ def setup_gradio():
 		training_output.change(
 			fn=update_training_dataplot,
 			inputs=[
-				training_graph_x_lim,
-				training_graph_y_lim,
+				training_graph_x_min,
+				training_graph_x_max,
+				training_graph_y_min,
+				training_graph_y_max,
 			],
 			outputs=[
 				training_loss_graph,
@@ -874,8 +884,10 @@ def setup_gradio():
 		view_losses.click(
 			fn=update_training_dataplot,
 			inputs=[
-				training_graph_x_lim,
-				training_graph_y_lim,
+				training_graph_x_min,
+				training_graph_x_max,
+				training_graph_y_min,
+				training_graph_y_max,
 				training_configs,
 			],
 			outputs=[
