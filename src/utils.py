@@ -2277,11 +2277,38 @@ def create_dataset_json( path ):
 	with open(path.replace(".txt", ".json"), 'w', encoding='utf-8') as f:
 		f.write(json.dumps(data, indent="\t"))
 
+
+cached_backends = {}
+
 def phonemizer( text, language="en-us" ):
 	from phonemizer import phonemize
+	from phonemizer.backend import BACKENDS
+
+	def _get_backend( language="en-us", backend="espeak" ):
+	    key = f'{language}_{backend}'
+	    if key in cached_backends:
+	        return cached_backends[key]
+
+	    if backend == 'espeak':
+	        phonemizer = BACKENDS[backend]( language, preserve_punctuation=True, with_stress=True)
+	    elif backend == 'espeak-mbrola':
+	        phonemizer = BACKENDS[backend]( language )
+	    else: 
+	        phonemizer = BACKENDS[backend]( language, preserve_punctuation=True )
+
+	    cached_backends[key] = phonemizer
+	    return phonemizer
 	if language == "en":
 		language = "en-us"
-	return phonemize( text, language=language, strip=True, preserve_punctuation=True, with_stress=True, backend=args.phonemizer_backend )
+
+	backend = _get_backend(language=language, backend=args.phonemizer_backend)
+    if backend is not None:
+        tokens = backend.phonemize( text, strip=True )
+    else:
+        tokens = phonemize( text, language=language, strip=True, preserve_punctuation=True, with_stress=True )
+
+    return tokens[0] if len(tokens) == 0 else tokens
+    tokenized = " ".join( tokens )
 
 def should_phonemize():
 	should = args.tokenizer_json is not None and args.tokenizer_json[-8:] == "ipa.json"
