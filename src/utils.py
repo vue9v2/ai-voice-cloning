@@ -106,16 +106,16 @@ if BARK_ENABLED:
 			self.output_sample_rate = args.output_sample_rate
 
 			preload_models(
-			    text_use_gpu=True,
-			    coarse_use_gpu=True,
-			    fine_use_gpu=True,
-			    codec_use_gpu=True,
+				text_use_gpu=True,
+				coarse_use_gpu=True,
+				fine_use_gpu=True,
+				codec_use_gpu=True,
 
-			    text_use_small=small,
-			    coarse_use_small=small,
-			    fine_use_small=small,
-			    
-			    force_reload=False
+				text_use_small=small,
+				coarse_use_small=small,
+				fine_use_small=small,
+				
+				force_reload=False
 			)
 
 		def create_voice( self, voice, device='cuda' ):
@@ -150,7 +150,7 @@ if BARK_ENABLED:
 
 			# Extract discrete codes from EnCodec
 			with torch.no_grad():
-			    encoded_frames = model.encode(wav)
+				encoded_frames = model.encode(wav)
 			codes = torch.cat([encoded[0] for encoded in encoded_frames], dim=-1).squeeze().cpu().numpy()  # [n_q, T]
 
 			# get seconds of audio
@@ -2285,30 +2285,30 @@ def phonemizer( text, language="en-us" ):
 	from phonemizer.backend import BACKENDS
 
 	def _get_backend( language="en-us", backend="espeak" ):
-	    key = f'{language}_{backend}'
-	    if key in cached_backends:
-	        return cached_backends[key]
+		key = f'{language}_{backend}'
+		if key in cached_backends:
+			return cached_backends[key]
 
-	    if backend == 'espeak':
-	        phonemizer = BACKENDS[backend]( language, preserve_punctuation=True, with_stress=True)
-	    elif backend == 'espeak-mbrola':
-	        phonemizer = BACKENDS[backend]( language )
-	    else: 
-	        phonemizer = BACKENDS[backend]( language, preserve_punctuation=True )
+		if backend == 'espeak':
+			phonemizer = BACKENDS[backend]( language, preserve_punctuation=True, with_stress=True)
+		elif backend == 'espeak-mbrola':
+			phonemizer = BACKENDS[backend]( language )
+		else: 
+			phonemizer = BACKENDS[backend]( language, preserve_punctuation=True )
 
-	    cached_backends[key] = phonemizer
-	    return phonemizer
+		cached_backends[key] = phonemizer
+		return phonemizer
 	if language == "en":
 		language = "en-us"
 
 	backend = _get_backend(language=language, backend=args.phonemizer_backend)
-    if backend is not None:
-        tokens = backend.phonemize( text, strip=True )
-    else:
-        tokens = phonemize( text, language=language, strip=True, preserve_punctuation=True, with_stress=True )
+	if backend is not None:
+		tokens = backend.phonemize( text, strip=True )
+	else:
+		tokens = phonemize( text, language=language, strip=True, preserve_punctuation=True, with_stress=True )
 
-    return tokens[0] if len(tokens) == 0 else tokens
-    tokenized = " ".join( tokens )
+	return tokens[0] if len(tokens) == 0 else tokens
+	tokenized = " ".join( tokens )
 
 def should_phonemize():
 	should = args.tokenizer_json is not None and args.tokenizer_json[-8:] == "ipa.json"
