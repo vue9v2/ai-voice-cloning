@@ -221,7 +221,6 @@ def prepare_all_datasets( language, validation_text_length, validation_audio_len
 	messages = []
 	voices = get_voice_list()
 
-	"""
 	for voice in voices:
 		print("Processing:", voice)
 		message = transcribe_dataset( voice=voice, language=language, skip_existings=skip_existings, progress=progress )
@@ -232,8 +231,7 @@ def prepare_all_datasets( language, validation_text_length, validation_audio_len
 			print("Processing:", voice)
 			message = slice_dataset( voice, trim_silence=trim_silence, start_offset=slice_start_offset, end_offset=slice_end_offset, results=None, progress=progress )
 			messages.append(message)
-	"""
-
+			
 	for voice in voices:
 		print("Processing:", voice)
 		message = prepare_dataset( voice, use_segments=slice_audio, text_length=validation_text_length, audio_length=validation_audio_length, progress=progress )
