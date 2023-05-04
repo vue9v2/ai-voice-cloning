@@ -200,7 +200,7 @@ def read_generate_settings_proxy(file, saveAs='.temp'):
 def slice_dataset_proxy( voice, trim_silence, start_offset, end_offset, progress=gr.Progress(track_tqdm=True) ):
 	return slice_dataset( voice, trim_silence=trim_silence, start_offset=start_offset, end_offset=end_offset, results=None, progress=progress )
 
-def diarize_dataset( voice, progress=gr.Progress(track_tqdm=False) ):
+def diarize_dataset( voice, progress=gr.Progress(track_tqdm=True) ):
 	from pyannote.audio import Pipeline
 	pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=args.hf_token)
 
@@ -215,7 +215,7 @@ def diarize_dataset( voice, progress=gr.Progress(track_tqdm=False) ):
 
 	return "\n".join(messages)
 
-def prepare_all_datasets( language, validation_text_length, validation_audio_length, skip_existings, slice_audio, trim_silence, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=False) ):
+def prepare_all_datasets( language, validation_text_length, validation_audio_length, skip_existings, slice_audio, trim_silence, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=True) ):
 	kwargs = locals()
 
 	messages = []
@@ -239,7 +239,7 @@ def prepare_all_datasets( language, validation_text_length, validation_audio_len
 
 	return "\n".join(messages)
 
-def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, trim_silence, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=False) ):
+def prepare_dataset_proxy( voice, language, validation_text_length, validation_audio_length, skip_existings, slice_audio, trim_silence, slice_start_offset, slice_end_offset, progress=gr.Progress(track_tqdm=True) ):
 	messages = []
 	
 	message = transcribe_dataset( voice=voice, language=language, skip_existings=skip_existings, progress=progress )

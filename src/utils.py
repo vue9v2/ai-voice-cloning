@@ -238,7 +238,7 @@ def generate_bark(**kwargs):
 		if tts_loading:
 			raise Exception("TTS is still initializing...")
 		if progress is not None:
-			progress(0, "Initializing TTS...")
+			notify_progress("Initializing TTS...", progress=progress)
 		load_tts()
 	if hasattr(tts, "loading") and tts.loading:
 		raise Exception("TTS is still initializing...")
@@ -339,8 +339,8 @@ def generate_bark(**kwargs):
 
 	INFERENCING = True
 	for line, cut_text in enumerate(texts):	
-		progress.msg_prefix = f'[{str(line+1)}/{str(len(texts))}]'
-		print(f"{progress.msg_prefix} Generating line: {cut_text}")
+		tqdm_prefix = f'[{str(line+1)}/{str(len(texts))}]'
+		print(f"{tqdm_prefix} Generating line: {cut_text}")
 		start_time = time.time()
 
 		# do setting editing
@@ -422,12 +422,12 @@ def generate_bark(**kwargs):
 
 	if args.voice_fixer:
 		if not voicefixer:
-			progress(0, "Loading voicefix...")
+			notify_progress("Loading voicefix...", progress=progress)
 			load_voicefixer()
 
 		try:
 			fixed_cache = {}
-			for name in progress.tqdm(audio_cache, desc="Running voicefix..."):
+			for name in tqdm(audio_cache, desc="Running voicefix..."):
 				del audio_cache[name]['audio']
 				if 'output' not in audio_cache[name] or not audio_cache[name]['output']:
 					continue
@@ -467,7 +467,7 @@ def generate_bark(**kwargs):
 				f.write(json.dumps(audio_cache[name]['settings'], indent='\t') )
 
 	if args.embed_output_metadata:
-		for name in progress.tqdm(audio_cache, desc="Embedding metadata..."):
+		for name in tqdm(audio_cache, desc="Embedding metadata..."):
 			if 'pruned' in audio_cache[name] and audio_cache[name]['pruned']:
 				continue
 
@@ -521,7 +521,7 @@ def generate_valle(**kwargs):
 		if tts_loading:
 			raise Exception("TTS is still initializing...")
 		if progress is not None:
-			progress(0, "Initializing TTS...")
+			notify_progress("Initializing TTS...", progress=progress)
 		load_tts()
 	if hasattr(tts, "loading") and tts.loading:
 		raise Exception("TTS is still initializing...")
@@ -630,8 +630,8 @@ def generate_valle(**kwargs):
 
 	INFERENCING = True
 	for line, cut_text in enumerate(texts):	
-		progress.msg_prefix = f'[{str(line+1)}/{str(len(texts))}]'
-		print(f"{progress.msg_prefix} Generating line: {cut_text}")
+		tqdm_prefix = f'[{str(line+1)}/{str(len(texts))}]'
+		print(f"{tqdm_prefix} Generating line: {cut_text}")
 		start_time = time.time()
 
 		# do setting editing
@@ -715,12 +715,12 @@ def generate_valle(**kwargs):
 
 	if args.voice_fixer:
 		if not voicefixer:
-			progress(0, "Loading voicefix...")
+			notify_progress("Loading voicefix...", progress=progress)
 			load_voicefixer()
 
 		try:
 			fixed_cache = {}
-			for name in progress.tqdm(audio_cache, desc="Running voicefix..."):
+			for name in tqdm(audio_cache, desc="Running voicefix..."):
 				del audio_cache[name]['audio']
 				if 'output' not in audio_cache[name] or not audio_cache[name]['output']:
 					continue
@@ -760,7 +760,7 @@ def generate_valle(**kwargs):
 				f.write(json.dumps(audio_cache[name]['settings'], indent='\t') )
 
 	if args.embed_output_metadata:
-		for name in progress.tqdm(audio_cache, desc="Embedding metadata..."):
+		for name in tqdm(audio_cache, desc="Embedding metadata..."):
 			if 'pruned' in audio_cache[name] and audio_cache[name]['pruned']:
 				continue
 
@@ -839,7 +839,7 @@ def generate_tortoise(**kwargs):
 			voice_samples, conditioning_latents = None, tts.get_random_conditioning_latents()
 		else:
 			if progress is not None:
-				progress(0, desc=f"Loading voice: {voice}")
+				notify_progress(f"Loading voice: {voice}", progress=progress)
 
 			voice_samples, conditioning_latents = load_voice(voice, model_hash=tts.autoregressive_model_hash)
 			
@@ -1032,8 +1032,8 @@ def generate_tortoise(**kwargs):
 		elif parameters['emotion'] != "None" and parameters['emotion']:
 			cut_text = f"[I am really {parameters['emotion'].lower()},] {cut_text}"
 		
-		progress.msg_prefix = f'[{str(line+1)}/{str(len(texts))}]'
-		print(f"{progress.msg_prefix} Generating line: {cut_text}")
+		tqdm_prefix = f'[{str(line+1)}/{str(len(texts))}]'
+		print(f"{tqdm_prefix} Generating line: {cut_text}")
 		start_time = time.time()
 
 		# do setting editing
@@ -1115,12 +1115,12 @@ def generate_tortoise(**kwargs):
 
 	if args.voice_fixer:
 		if not voicefixer:
-			progress(0, "Loading voicefix...")
+			notify_progress("Loading voicefix...", progress=progress)
 			load_voicefixer()
 
 		try:
 			fixed_cache = {}
-			for name in progress.tqdm(audio_cache, desc="Running voicefix..."):
+			for name in tqdm(audio_cache, desc="Running voicefix..."):
 				del audio_cache[name]['audio']
 				if 'output' not in audio_cache[name] or not audio_cache[name]['output']:
 					continue
@@ -1160,7 +1160,7 @@ def generate_tortoise(**kwargs):
 				f.write(json.dumps(audio_cache[name]['settings'], indent='\t') )
 
 	if args.embed_output_metadata:
-		for name in progress.tqdm(audio_cache, desc="Embedding metadata..."):
+		for name in tqdm(audio_cache, desc="Embedding metadata..."):
 			if 'pruned' in audio_cache[name] and audio_cache[name]['pruned']:
 				continue
 
@@ -1309,7 +1309,7 @@ def compute_latents(voice=None, voice_samples=None, voice_latents_chunks=0, prog
 	if voice_samples is None:
 		return
 
-	conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents, progress=progress)
+	conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents)
 
 	if len(conditioning_latents) == 4:
 		conditioning_latents = (conditioning_latents[0], conditioning_latents[1], conditioning_latents[2], None)
@@ -2117,7 +2117,7 @@ def transcribe_dataset( voice, language=None, skip_existings=False, progress=Non
 	if os.path.exists(infile):
 		results = json.load(open(infile, 'r', encoding="utf-8"))
 
-	for file in enumerate_progress(files, desc="Iterating through voice files", progress=progress):
+	for file in tqdm(files, desc="Iterating through voice files"):
 		basename = os.path.basename(file)
 
 		if basename in results and skip_existings:
@@ -2246,7 +2246,7 @@ def phonemize_txt_file( path ):
 
 	reparsed = []
 	with open(path.replace(".txt", ".phn.txt"), 'a', encoding='utf-8') as f:
-		for line in enumerate_progress(lines, desc='Phonemizing...'):
+		for line in tqdm(lines, desc='Phonemizing...'):
 			split = line.split("|")
 			audio = split[0]
 			text = split[2]
@@ -2357,7 +2357,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 		text_length = 0
 		audio_length = 0
 
-	for filename in enumerate_progress(results, desc="Parsing results", progress=progress):
+	for filename in tqdm(results, desc="Parsing results"):
 		use_segment = use_segments
 
 		result = results[filename]
@@ -2438,7 +2438,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 		'phonemize': [[], []],
 	}
 
-	for file in enumerate_progress(segments, desc="Parsing segments", progress=progress):
+	for file in tqdm(segments, desc="Parsing segments"):
 		result = segments[file]
 		path = f'{indir}/audio/{file}'
 
@@ -2511,7 +2511,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 			print("Phonemized:", file, normalized, text)
 			"""
 
-	for i in enumerate_progress(range(len(jobs['quantize'][0])), desc="Quantizing", progress=progress):
+	for i in tqdm(range(len(jobs['quantize'][0])), desc="Quantizing"):
 		qnt_file = jobs['quantize'][0][i]
 		waveform, sample_rate = jobs['quantize'][1][i]
 
@@ -2519,7 +2519,7 @@ def prepare_dataset( voice, use_segments=False, text_length=0, audio_length=0, p
 		torch.save(quantized, qnt_file)
 		print("Quantized:", qnt_file)
 
-	for i in enumerate_progress(range(len(jobs['phonemize'][0])), desc="Phonemizing", progress=progress):
+	for i in tqdm(range(len(jobs['phonemize'][0])), desc="Phonemizing"):
 		phn_file = jobs['phonemize'][0][i]
 		normalized = jobs['phonemize'][1][i]
 
@@ -2807,7 +2807,7 @@ def import_voices(files, saveAs=None, progress=None):
 	if not isinstance(files, list):
 		files = [files]
 
-	for file in enumerate_progress(files, desc="Importing voice files", progress=progress):
+	for file in tqdm(files, desc="Importing voice files"):
 		j, latents = read_generate_settings(file, read_latents=True)
 		
 		if j is not None and saveAs is None:
@@ -3025,22 +3025,14 @@ def check_for_updates( dir = None ):
 
 	return False
 
-def enumerate_progress(iterable, desc=None, progress=None, verbose=None):
-	if verbose and desc is not None:
-		print(desc)
-
-	if progress is None:
-		return tqdm(iterable, disable=False) #not verbose)
-	return progress.tqdm(iterable, desc=f'{progress.msg_prefix} {desc}' if hasattr(progress, 'msg_prefix') else desc)
-
 def notify_progress(message, progress=None, verbose=True):
 	if verbose:
 		print(message)
 
 	if progress is None:
-		return
-
-	progress(0, desc=message)
+		tqdm.write( desc=message)
+	else:
+		progress(0, desc=message)
 
 def get_args():
 	global args
@@ -3650,7 +3642,7 @@ def load_whisper_model(language=None, model_name=None, progress=None):
 		model_name = f'{model_name}.{language}'
 		print(f"Loading specialized model for language: {language}")
 
-	notify_progress(f"Loading Whisper model: {model_name}", progress)
+	notify_progress(f"Loading Whisper model: {model_name}", progress=progress)
 
 	if args.whisper_backend == "openai/whisper":
 		import whisper
@@ -3733,7 +3725,7 @@ def merge_models( primary_model_name, secondary_model_name, alpha, progress=gr.P
 	theta_0 = read_model(primary_model_name)
 	theta_1 = read_model(secondary_model_name)
 
-	for key in enumerate_progress(theta_0.keys(), desc="Merging...", progress=progress):
+	for key in tqdm(theta_0.keys(), desc="Merging..."):
 		if key in key_blacklist:
 			print("Skipping ignored key:", key)
 			continue
