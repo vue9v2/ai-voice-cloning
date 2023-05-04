@@ -3031,7 +3031,7 @@ def enumerate_progress(iterable, desc=None, progress=None, verbose=None):
 
 	if progress is None:
 		return tqdm(iterable, disable=False) #not verbose)
-	return progress.tqdm(iterable, desc=f'{progress.msg_prefix} {desc}' if hasattr(progress, 'msg_prefix') else desc, track_tqdm=True)
+	return progress.tqdm(iterable, desc=f'{progress.msg_prefix} {desc}' if hasattr(progress, 'msg_prefix') else desc)
 
 def notify_progress(message, progress=None, verbose=True):
 	if verbose:
