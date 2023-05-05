@@ -3030,7 +3030,7 @@ def notify_progress(message, progress=None, verbose=True):
 		print(message)
 
 	if progress is None:
-		tqdm.write( desc=message)
+		tqdm.write(message)
 	else:
 		progress(0, desc=message)
 
