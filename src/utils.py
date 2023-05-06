@@ -3660,9 +3660,12 @@ def load_whisper_model(language=None, model_name=None, progress=None):
 		b_lang = language.encode('ascii')
 		whisper_model = Whisper(model_name, models_dir='./models/', language=b_lang)
 	elif args.whisper_backend == "m-bain/whisperx":
-		import whisperx
+		import whisper, whisperx
 		device = "cuda" if get_device_name() == "cuda" else "cpu"
-		whisper_model = whisperx.load_model(model_name, device)
+		try:
+			whisper_model = whisperx.load_model(model_name, device)
+		except Exception as e:
+			whisper_model = whisper.load_model(model_name, device)
 
 		if not args.hf_token:
 			print("No huggingface token used, needs to be saved in environment variable, otherwise will throw error loading VAD model.")
