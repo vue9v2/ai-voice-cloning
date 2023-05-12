@@ -2320,9 +2320,9 @@ def phonemizer( text, language="en-us" ):
 
 	backend = _get_backend(language=language, backend=args.phonemizer_backend)
 	if backend is not None:
-		tokens = backend.phonemize( text, strip=True )
+		tokens = backend.phonemize( [text], strip=True )
 	else:
-		tokens = phonemize( text, language=language, strip=True, preserve_punctuation=True, with_stress=True )
+		tokens = phonemize( [text], language=language, strip=True, preserve_punctuation=True, with_stress=True )
 
 	return tokens[0] if len(tokens) == 0 else tokens
 	tokenized = " ".join( tokens )
