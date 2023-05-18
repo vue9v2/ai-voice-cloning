@@ -2,7 +2,7 @@ git+https://github.com/openai/whisper.git
 
 more-itertools
 ffmpeg-python
-gradio
+gradio<=3.23.0
 music-tag
 voicefixer
 psutil
