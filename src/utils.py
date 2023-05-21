@@ -3475,9 +3475,12 @@ def update_autoregressive_model(autoregressive_model_path):
 	if args.tts_backend != "tortoise":
 		raise f"Unsupported backend: {args.tts_backend}"
 
-	match = re.findall(r'^\[[a-fA-F0-9]{8}\] (.+?)$', autoregressive_model_path)
-	if match:
-		autoregressive_model_path = match[0]
+	if autoregressive_model_path == "auto":
+		autoregressive_model_path = deduce_autoregressive_model()
+	else
+		match = re.findall(r'^\[[a-fA-F0-9]{8}\] (.+?)$', autoregressive_model_path)
+		if match:
+			autoregressive_model_path = match[0]
 
 	if not autoregressive_model_path or not os.path.exists(autoregressive_model_path):
 		print(f"Invalid model: {autoregressive_model_path}")
@@ -3496,8 +3499,6 @@ def update_autoregressive_model(autoregressive_model_path):
 	if hasattr(tts, "loading") and tts.loading:
 		raise Exception("TTS is still initializing...")
 
-	if autoregressive_model_path == "auto":
-		autoregressive_model_path = deduce_autoregressive_model()
 
 	if autoregressive_model_path == tts.autoregressive_model_path:
 		return
