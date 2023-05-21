@@ -725,7 +725,8 @@ def setup_gradio():
 				EXEC_SETTINGS['autoregressive_model'].change(
 					fn=update_autoregressive_model,
 					inputs=EXEC_SETTINGS['autoregressive_model'],
-					outputs=None
+					outputs=None,
+					api_name="set_autoregressive_model"
 				)
 
 				EXEC_SETTINGS['vocoder_model'].change(
