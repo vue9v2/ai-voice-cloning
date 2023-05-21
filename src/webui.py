@@ -78,6 +78,8 @@ def generate_proxy(
 	repetition_penalty,
 	cond_free_k,
 	experimentals,
+	voice_latents_original_ar,
+	voice_latents_original_diffusion,
 	progress=gr.Progress(track_tqdm=True)
 ):
 	kwargs = locals()
@@ -166,12 +168,12 @@ def reset_generate_settings_proxy():
 
 	return tuple(res)
 
-def compute_latents_proxy(voice, voice_latents_chunks, progress=gr.Progress(track_tqdm=True)):
+def compute_latents_proxy(voice, voice_latents_chunks, original_ar, original_diffusion, progress=gr.Progress(track_tqdm=True)):
 	if args.tts_backend == "bark":
 		global tts
 		tts.create_voice( voice )
 		return voice
-	compute_latents( voice=voice, voice_latents_chunks=voice_latents_chunks, progress=progress )
+	compute_latents( voice=voice, voice_latents_chunks=voice_latents_chunks, original_ar=original_ar, original_diffusion=original_diffusion )
 	return voice
 
 
@@ -387,6 +389,8 @@ def setup_gradio():
 					GENERATE_SETTINGS["voice"] = gr.Dropdown(choices=voice_list_with_defaults, label="Voice", type="value", value=voice_list_with_defaults[0]) # it'd be very cash money if gradio was able to default to the first value in the list without this shit
 					GENERATE_SETTINGS["mic_audio"] = gr.Audio( label="Microphone Source", source="microphone", type="filepath", visible=False )
 					GENERATE_SETTINGS["voice_latents_chunks"] = gr.Number(label="Voice Chunks", precision=0, value=0, visible=args.tts_backend=="tortoise")
+					GENERATE_SETTINGS["voice_latents_original_ar"] = gr.Checkbox(label="Use Original Latents Method (AR)", visible=args.tts_backend=="tortoise")
+					GENERATE_SETTINGS["voice_latents_original_diffusion"] = gr.Checkbox(label="Use Original Latents Method (Diffusion)", visible=args.tts_backend=="tortoise")
 					with gr.Row():
 						refresh_voices = gr.Button(value="Refresh Voice List")
 						recompute_voice_latents = gr.Button(value="(Re)Compute Voice Latents")
@@ -783,6 +787,8 @@ def setup_gradio():
 			inputs=[
 				GENERATE_SETTINGS['voice'],
 				GENERATE_SETTINGS['voice_latents_chunks'],
+				GENERATE_SETTINGS['voice_latents_original_ar'],
+				GENERATE_SETTINGS['voice_latents_original_diffusion'],
 			],
 			outputs=GENERATE_SETTINGS['voice'],
 		)

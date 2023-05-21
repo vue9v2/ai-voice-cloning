@@ -875,7 +875,6 @@ def generate_tortoise(**kwargs):
 			'k': parameters['candidates'],
 			'diffusion_sampler': parameters['diffusion_sampler'],
 			'breathing_room': parameters['breathing_room'],
-			'progress': parameters['progress'],
 			'half_p': "Half Precision" in parameters['experimentals'],
 			'cond_free': "Conditioning-Free" in parameters['experimentals'],
 			'cvvp_amount': parameters['cvvp_weight'],
@@ -1256,7 +1255,7 @@ def update_baseline_for_latents_chunks( voice ):
 		return int(total_duration / total) if total > 0 else 1
 	return int(total_duration / args.autocalculate_voice_chunk_duration_size) if total_duration > 0 else 1
 
-def compute_latents(voice=None, voice_samples=None, voice_latents_chunks=0, progress=None):
+def compute_latents(voice=None, voice_samples=None, voice_latents_chunks=0, original_ar=False, original_diffusion=False):
 	global tts
 	global args
 	
@@ -1309,7 +1308,7 @@ def compute_latents(voice=None, voice_samples=None, voice_latents_chunks=0, prog
 	if voice_samples is None:
 		return
 
-	conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents)
+	conditioning_latents = tts.get_conditioning_latents(voice_samples, return_mels=not args.latents_lean_and_mean, slices=voice_latents_chunks, force_cpu=args.force_cpu_for_conditioning_latents, original_ar=original_ar, original_diffusion=original_diffusion)
 
 	if len(conditioning_latents) == 4:
 		conditioning_latents = (conditioning_latents[0], conditioning_latents[1], conditioning_latents[2], None)
