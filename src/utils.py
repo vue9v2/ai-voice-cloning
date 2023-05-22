@@ -3477,7 +3477,7 @@ def update_autoregressive_model(autoregressive_model_path):
 
 	if autoregressive_model_path == "auto":
 		autoregressive_model_path = deduce_autoregressive_model()
-	else
+	else:
 		match = re.findall(r'^\[[a-fA-F0-9]{8}\] (.+?)$', autoregressive_model_path)
 		if match:
 			autoregressive_model_path = match[0]
