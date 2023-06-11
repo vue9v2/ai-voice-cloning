@@ -3008,7 +3008,7 @@ def get_args():
 	global args
 	return args
 
-def setup_args():
+def setup_args(cli=False):
 	global args
 
 	default_arguments = {
@@ -3066,7 +3066,7 @@ def setup_args():
 				print(e)
 				pass
 
-	parser = argparse.ArgumentParser()
+	parser = argparse.ArgumentParser(allow_abbrev=not cli)
 	parser.add_argument("--share", action='store_true', default=default_arguments['share'], help="Lets Gradio return a public URL to use anywhere")
 	parser.add_argument("--listen", default=default_arguments['listen'], help="Path for Gradio to listen on")
 	parser.add_argument("--check-for-updates", action='store_true', default=default_arguments['check-for-updates'], help="Checks for update on startup")
@@ -3108,7 +3108,10 @@ def setup_args():
 	parser.add_argument("--training-default-bnb", action='store_true', default=default_arguments['training-default-bnb'], help="Training default: bnb")
 	
 	parser.add_argument("--os", default="unix", help="Specifies which OS, easily")
-	args = parser.parse_args()
+	if cli:
+		args, unknown = parser.parse_known_args()
+	else:
+		args = parser.parse_args()
 
 	args.embed_output_metadata = not args.no_embed_output_metadata
 
