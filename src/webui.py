@@ -169,10 +169,6 @@ def reset_generate_settings_proxy():
 	return tuple(res)
 
 def compute_latents_proxy(voice, voice_latents_chunks, original_ar, original_diffusion, progress=gr.Progress(track_tqdm=True)):
-	if args.tts_backend == "bark":
-		global tts
-		tts.create_voice( voice )
-		return voice
 	compute_latents( voice=voice, voice_latents_chunks=voice_latents_chunks, original_ar=original_ar, original_diffusion=original_diffusion )
 	return voice
 
