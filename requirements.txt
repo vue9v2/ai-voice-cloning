@@ -7,3 +7,4 @@ music-tag
 voicefixer
 psutil
 phonemizer
+pydantic==1.10.11
