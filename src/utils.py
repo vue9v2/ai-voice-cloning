@@ -192,11 +192,34 @@ if BARK_ENABLED:
 			candidates = []
 			for file in transcriptions:
 				result = transcriptions[file]
+				added = 0
+
 				for segment in result['segments']:
+					path = file.replace(".wav", f"_{pad(segment['id'], 4)}.wav")
+					# check if the slice actually exists
+					if not os.path.exists(f'./training/{voice}/audio/{path}'):
+						continue
+
 					entry = (
-						file.replace(".wav", f"_{pad(segment['id'], 4)}.wav"),
+						path,
 						segment['end'] - segment['start'],
 						segment['text']
+					)
+					candidates.append(entry)
+					added = added + 1
+
+				# if nothing got added (assuming because nothign was sliced), use the master file
+				if added == 0: # added < len(result['segments']):
+					start = 0
+					end = 0
+					for segment in result['segments']:
+						start = max( start, segment['start'] )
+						end = max( end, segment['end'] )
+
+					entry = (
+						file,
+						end - start,
+						result['text']
 					)
 					candidates.append(entry)
 
