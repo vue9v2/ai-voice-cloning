@@ -97,6 +97,7 @@ if VALLE_ENABLED:
 	TTSES.append('vall-e')
 
 try:
+	import bark
 	from bark import text_to_semantic
 	from bark.generation import SAMPLE_RATE as BARK_SAMPLE_RATE, ALLOWED_PROMPTS, preload_models, codec_decode, generate_coarse, generate_fine, generate_text_semantic, load_codec_model
 	from bark.api import generate_audio as bark_generate_audio
@@ -275,7 +276,9 @@ if BARK_ENABLED:
 				# generate semantic tokens
 				semantic_tokens = generate_text_semantic(text, max_gen_duration_s=seconds, top_k=50, top_p=.95, temp=0.7)
 
-			output_path = './modules/bark/bark/assets/prompts/' + voice.replace("/", "_") + '.npz'
+			# print(bark.__file__)
+			bark_location = os.path.dirname(os.path.relpath(bark.__file__)) # './modules/bark/bark/'
+			output_path = f'./{bark_location}/assets/prompts/' + voice.replace("/", "_") + '.npz'
 			np.savez(output_path, fine_prompt=codes, coarse_prompt=codes[:2, :], semantic_prompt=semantic_tokens)
 
 		def inference( self, text, voice, text_temp=0.7, waveform_temp=0.7 ):
@@ -547,8 +550,12 @@ def generate_bark(**kwargs):
 				'output': True
 			}
 		else:
-			name = get_name(candidate=candidate)
-			audio_cache[name]['output'] = True
+			try:
+				name = get_name(candidate=candidate)
+				audio_cache[name]['output'] = True
+			except Exception as e:
+				for name in audio_cache:
+					audio_cache[name]['output'] = True
 
 
 	if args.voice_fixer:
