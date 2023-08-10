@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  app:
+    command: python ./src/main.py --listen 0.0.0.0:7680
+    build: .
+    stdin_open: true
+    tty: true
+    shm_size: '4gb'
+    ports:
+      - 7680:7680
+    volumes:
+      - ../data:/data
+      - ./:/home/user/ai-voice-cloning/

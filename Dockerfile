@@ -32,6 +32,6 @@ RUN python3 -m pip install -r ./modules/dlas/requirements.txt
 RUN python3 -m pip install -e ./modules/dlas/
 ADD requirements.txt requirements.txt
 RUN python3 -m pip install -r ./requirements.txt
-ADD --chown=user:user . $HOME/ai-voice-cloning
+# ADD --chown=user:user . $HOME/ai-voice-cloning
 
 CMD ["python", "./src/main.py", "--listen", "0.0.0.0:7680"]
