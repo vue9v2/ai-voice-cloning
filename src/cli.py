@@ -34,7 +34,7 @@ if __name__ == "__main__":
 	parser.add_argument("--top_p", type=float, default=default_arguments['top_p'])
 	parser.add_argument("--diffusion_temperature", type=float, default=default_arguments['diffusion_temperature'])
 	parser.add_argument("--length_penalty", type=float, default=default_arguments['length_penalty'])
-	parser.add_argument("--repetition_penalty", type=float default=default_arguments['repetition_penalty'])
+	parser.add_argument("--repetition_penalty", type=float, default=default_arguments['repetition_penalty'])
 	parser.add_argument("--cond_free_k", type=float, default=default_arguments['cond_free_k'])
 
 	args, unknown = parser.parse_known_args()
