@@ -3401,7 +3401,7 @@ def import_generate_settings(file = None):
 		'prompt': None,
 		'voice': "random",
 		'mic_audio': None,
-		'voice_latents_chunks': None,
+		'voice_latents_chunks': 0,
 		'candidates': None,
 		'seed': None,
 		'num_autoregressive_samples': 16,
@@ -3415,7 +3415,7 @@ def import_generate_settings(file = None):
 		'length_penalty': 1.0,
 		'repetition_penalty': 2.0,
 		'cond_free_k': 2.0,
-		'experimentals': None,
+		'experimentals': [],
 	}
 
 	settings, _ = read_generate_settings(file, read_latents=False)
