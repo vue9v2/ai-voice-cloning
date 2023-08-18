@@ -933,6 +933,9 @@ def generate_valle(**kwargs):
 def generate_tortoise(**kwargs):
 	parameters = {}
 	parameters.update(kwargs)
+	print("++++++++++++++++++++++kwargs+++++++++++++++++++++++")
+	print(kwargs)
+	print("++++++++++++++++++++++kwargs+++++++++++++++++++++++")
 
 	voice = parameters['voice']
 	progress = parameters['progress'] if 'progress' in parameters else None
