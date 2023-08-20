@@ -933,9 +933,6 @@ def generate_valle(**kwargs):
 def generate_tortoise(**kwargs):
 	parameters = {}
 	parameters.update(kwargs)
-	print("++++++++++++++++++++++kwargs+++++++++++++++++++++++")
-	print(kwargs)
-	print("++++++++++++++++++++++kwargs+++++++++++++++++++++++")
 
 	voice = parameters['voice']
 	progress = parameters['progress'] if 'progress' in parameters else None
@@ -1160,6 +1157,10 @@ def generate_tortoise(**kwargs):
 					pass
 
 		return info
+
+	print("++++++++++++++++++++++kwargs+++++++++++++++++++++++")
+	print(parameters)
+	print("++++++++++++++++++++++kwargs+++++++++++++++++++++++")
 
 	INFERENCING = True
 	for line, cut_text in enumerate(texts):
@@ -3422,6 +3423,9 @@ def import_generate_settings(file = None):
 	}
 
 	settings, _ = read_generate_settings(file, read_latents=False)
+	print("--------settings--------")
+	print(settings)
+	print("--------settings--------")
 
 	if settings is not None:
 		res.update(settings)
